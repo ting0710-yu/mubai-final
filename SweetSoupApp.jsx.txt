@@ -1,0 +1,121 @@
+import React, { useState, useEffect } from 'react';
+    import { 
+      BookOpen, 
+      Calculator, 
+      Package, 
+      HelpCircle, 
+      Wrench, 
+      Plus, 
+      Minus, 
+      Search, 
+      ChefHat,
+      Droplet,
+      Thermometer,
+      Info,
+      ShieldAlert,
+      ClipboardList,
+      Flame,
+      ArrowLeft,
+      Coffee,
+      Layers,
+      Sparkles,
+      Utensils,
+      RefreshCw,
+      Trash2,
+      Database,
+      Box,
+      Snowflake,
+      Milk,
+      Candy,
+      User,
+      History,
+      Lock,
+      KeyRound,
+      CheckCircle,
+      AlertCircle
+    } from 'lucide-react';
+    import { initializeApp } from 'firebase/app';
+    import { 
+      getAuth, 
+      signInAnonymously, 
+      onAuthStateChanged
+    } from 'firebase/auth';
+    import { 
+      getFirestore, 
+      collection, 
+      doc, 
+      setDoc, 
+      onSnapshot, 
+      updateDoc, 
+      increment,
+      query,
+      writeBatch,
+      getDocs,
+      addDoc
+    } from 'firebase/firestore';
+
+    // --- Firebase Config ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyB2chVdcyUo5VnAmdtsLtedYyxN2sevOMw",
+      authDomain: "mubai-20992.firebaseapp.com",
+      projectId: "mubai-20992",
+      storageBucket: "mubai-20992.firebasestorage.app",
+      messagingSenderId: "424210919088",
+      appId: "1:424210919088:web:431af5145383cca5815575",
+      measurementId: "G-D8BF48KC4N"
+    };
+
+    // Initialize Firebase
+    let app;
+    try {
+      app = initializeApp(firebaseConfig);
+    } catch (e) {
+      // Ignore duplicate initialization
+    }
+
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = 'mubai-store';
+
+    // --- Constants ---
+    const STORE_PASSWORD = "8888";
+    const SYRUP_IDS = ["syrup_manual", "sugar_water", "red_sugar_syrup", "mango_syrup"];
+
+    // --- Data ---
+    const RECIPES = [
+      {
+        id: "syrup_manual", name: "手工糖漿", category: "topping", baseServings: 1, unit: "份 (標準鍋)",
+        steps: ["準備設備：電磁爐、厚底鍋、篩網、水壺。", "將全部材料放入鍋中。", "電磁爐開大火 3500 煮開。", "轉小火 800 續煮 15 分鐘。", "過程不需要攪拌，也不要蓋蓋子。", "煮好後過濾保存。"],
+        ingredients: [{ name: "黃冰糖", amount: 1600, unit: "g" }, { name: "麥芽糖", amount: 80, unit: "g" }, { name: "熱水", amount: 1680, unit: "g" }, { name: "檸檬汁", amount: 12, unit: "g" }],
+        equipment: "電磁爐、厚底鍋、篩網、水壺", notes: "過程不攪拌、不蓋蓋子", storage: "冷藏保存"
+      },
+      {
+        id: "sugar_water", name: "糖水", category: "topping", baseServings: 1, unit: "份",
+        steps: ["準備設備", "材料混合加熱至溶解"],
+        ingredients: [{ name: "熱水", amount: 500, unit: "g" }, { name: "砂糖", amount: 400, unit: "g" }, { name: "檸檬汁", amount: 0.5, unit: "g" }],
+        equipment: "電磁爐、厚底鍋", notes: "簡單混合加熱", storage: "冷藏"
+      },
+      {
+        id: "red_sugar_syrup", name: "紅糖漿", category: "topping", baseServings: 1, unit: "份",
+        steps: ["炒化糖", "煮沸", "轉小火"],
+        ingredients: [{ name: "片紅糖", amount: 140, unit: "g" }, { name: "黑糖", amount: 60, unit: "g" }, { name: "熱水", amount: 200, unit: "g" }, { name: "檸檬汁", amount: 0.6, unit: "g" }],
+        equipment: "厚底鍋", notes: "需炒化", storage: "冷藏"
+      },
+      { id: "mango_syrup", name: "芒果漿", category: "topping", baseServings: 1, unit: "份", steps: ["混合"], ingredients: [{ name: "淺色芒果漿", amount: 350, unit: "g" }, { name: "手工糖漿", amount: 20, unit: "g" }, { name: "水", amount: 10, unit: "g" }, { name: "檸檬水", amount: 0.6, unit: "g" }], equipment: "水壺", notes: "不耐放", storage: "冷藏" },
+      { id: "lotus_seeds", name: "蓮子", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋壓煮"], ingredients: [{ name: "蓮子", amount: 1000, unit: "g" }, { name: "紅片糖", amount: 300, unit: "g" }, { name: "砂糖", amount: 300, unit: "g" }, { name: "水", amount: 0, unit: "適量" }], equipment: "高壓鍋", notes: "閉氣壓", storage: "糖水保存" },
+      { id: "lotus_root", name: "蓮藕片", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "蓮藕", amount: 1500, unit: "g" }, { name: "砂糖", amount: 270, unit: "g" }, { name: "片紅糖", amount: 210, unit: "g" }, { name: "水", amount: 1500, unit: "g" }], equipment: "高壓鍋", notes: "收汁", storage: "冷藏" },
+      { id: "barley", name: "薏仁", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "薏仁", amount: 1000, unit: "g" }, { name: "水", amount: 4500, unit: "g" }, { name: "砂糖", amount: 200, unit: "g" }], equipment: "高壓鍋", notes: "閉氣", storage: "瀝乾" },
+      { id: "chestnut", name: "栗子", category: "topping", baseServings: 1, unit: "份", steps: ["煮沸"], ingredients: [{ name: "栗子", amount: 2500, unit: "g" }, { name: "黃冰糖", amount: 500, unit: "g" }], equipment: "鍋", notes: "撈浮沫", storage: "原湯" },
+      { id: "red_bean", name: "紅豆 (顆粒)", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "紅豆", amount: 400, unit: "g" }, { name: "砂糖", amount: 120, unit: "g" }, { name: "水", amount: 1170, unit: "g" }, { name: "檸檬汁", amount: 1, unit: "g" }], equipment: "高壓鍋", notes: "浸泡", storage: "瀝乾" },
+      { id: "cassava", name: "木薯", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "木薯", amount: 200, unit: "g" }, { name: "水", amount: 800, unit: "g" }, { name: "砂糖", amount: 50, unit: "g" }, { name: "片紅糖", amount: 50, unit: "g" }], equipment: "高壓鍋", notes: "閉氣", storage: "原湯" },
+      { id: "taro_chunks", name: "芋頭塊", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "芋頭塊", amount: 400, unit: "g" }, { name: "砂糖", amount: 100, unit: "g" }, { name: "片紅糖", amount: 30, unit: "g" }, { name: "水", amount: 1000, unit: "g" }], equipment: "高壓鍋", notes: "放氣", storage: "冷藏" },
+      { id: "sticky_rice_balls", name: "糯米球", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "水", amount: 500, unit: "g" }, { name: "白糯米", amount: 75, unit: "g" }, { name: "紫米", amount: 150, unit: "g" }, { name: "砂糖", amount: 20, unit: "g" }], equipment: "高壓鍋", notes: "預泡", storage: "冷藏" },
+      { id: "taro_paste", name: "芋泥", category: "topping", baseServings: 1, unit: "份", steps: ["蒸軟拌勻"], ingredients: [{ name: "芋泥(蒸熟)", amount: 1500, unit: "g" }, { name: "砂糖", amount: 145, unit: "g" }, { name: "淡奶", amount: 290, unit: "g" }, { name: "牛奶", amount: 300, unit: "g" }, { name: "黃油", amount: 36, unit: "g" }, { name: "煉乳", amount: 55, unit: "g" }, { name: "紫薯粉", amount: 7, unit: "g" }], equipment: "蒸籠", notes: "勤做", storage: "平盤" },
+      { id: "mochi_milk", name: "鮮奶米麻薯", category: "topping", baseServings: 1, unit: "份", steps: ["攪拌"], ingredients: [{ name: "木薯澱粉", amount: 20, unit: "g" }, { name: "糯米粉", amount: 80, unit: "g" }, { name: "砂糖", amount: 20, unit: "g" }, { name: "牛奶", amount: 250, unit: "g" }, { name: "鮮奶油", amount: 75, unit: "g" }, { name: "鹽", amount: 1, unit: "g" }, { name: "糯米(熟)", amount: 60, unit: "g" }], equipment: "鍋", notes: "不停攪拌", storage: "常溫" },
+      { id: "sweet_potato_chunks", name: "地瓜塊", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "地瓜", amount: 500, unit: "g" }, { name: "紅片糖", amount: 200, unit: "g" }, { name: "水", amount: 2000, unit: "g" }], equipment: "高壓鍋", notes: "閉氣", storage: "湯保存" },
+      { id: "oat_grains", name: "燕麥粒", category: "topping", baseServings: 1, unit: "份", steps: ["高壓鍋"], ingredients: [{ name: "燕麥粒", amount: 250, unit: "g" }, { name: "砂糖", amount: 50, unit: "g" }, { name: "水", amount: 1500, unit: "g" }], equipment: "高壓鍋", notes: "放氣", storage: "-" },
+      { id: "tofu_skin", name: "腐皮", category: "topping", baseServings: 1, unit: "份", steps: ["煮"], ingredients: [{ name: "乾腐皮", amount: 200, unit: "g" }], equipment: "鍋", notes: "換水", storage: "冷水" },
+      // Bases
+      { id: "soy_milk_base", name: "豆漿湯底", category: "base", baseServings: 1, unit: "份", steps: ["煮熱"], ingredients: [{ name: "豆漿", amount: 390, unit: "g" }, { name: "黃冰糖", amount: 16, unit: "g" }], equipment: "鍋", notes: "糖化", storage: "冷藏" },
+      { id: "milk_soup_base", name: "鮮奶湯底", category: "base", baseServings: 1, unit: "份", steps: ["混合"], ingredients: [{ name: "牛奶", amount: 3000, unit: "g" }, { name: "手工糖漿", amount: 250, unit: "g" }, { name: "咖奶", amount: 300, unit: "g" }, { name: "淡奶油", amount: 300, unit: "g" }, { name: "水", amount: 750, unit: "g" }], equipment: "壺", notes: "混合", storage: "冷藏" },
+      { id: "white_fungus_base", name: "銀耳湯底", category: "base", baseServings: 1, unit: "份", steps: ["煮"], ingredients: [{ name: "銀耳", amount: 70, unit: "g" }, { name: "砂糖", amount: 600, unit: "g" }, { name: "水", amount: 2000, unit: "g" }, { name: "補水", amount: 1500, unit: "g" }], equipment: "鍋", notes: "補水", storage: "冷藏" },
