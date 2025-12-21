@@ -309,7 +309,7 @@ const RecipeModule = () => {
         val = ing.amount * mult;
      } else {
         const batchWeight = getBatchWeight(recipe);
-        let servingSize = recipe.category === 'base' ? 200 : 40;
+        let servingSize = recipe.category === 'base' ? 450 : 40;
         const totalTargetWeight = servings * servingSize;
         const ratio = batchWeight > 0 ? totalTargetWeight / batchWeight : 1;
         val = ing.amount * ratio;
@@ -374,7 +374,7 @@ const RecipeModule = () => {
                    <input type="number" value={targetServings} onChange={(e) => setTargetServings(parseInt(e.target.value) || 0)} className="flex-1 p-2 text-xl font-bold text-center border-2 border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 text-amber-900 bg白" />
                    <button onClick={() => setTargetServings(m => m + 5)} className="w-10 h-10 flex items-center justify-center bg-white border border-amber-300 rounded-lg text-amber-600 font-bold">+5</button>
                  </div>
-                 <div className="text-xs text-amber-700 text-center font-medium bg-amber-100 py-1 rounded">計算基準：{selectedRecipe.category === 'base' ? '每碗 200g' : '每份 40g'} × {targetServings} 人 = 總需 {((selectedRecipe.category === 'base' ? 200 : 40) * targetServings / 1000).toFixed(1)} kg</div>
+                 <div className="text-xs text-amber-700 text-center font-medium bg-amber-100 py-1 rounded">計算基準：{selectedRecipe.category === 'base' ? '每碗 450g' : '每份 40g'} × {targetServings} 人 = 總需 {((selectedRecipe.category === 'base' ? 450 : 40) * targetServings / 1000).toFixed(1)} kg</div>
                </>
              )}
            </div>
