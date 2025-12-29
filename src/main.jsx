@@ -39,27 +39,15 @@ const ALLOWED_RADIUS = 500;
 const HOURLY_WAGE = 210;
 const CLOCK_IN_WINDOW_MINUTES = 30; 
 
-// 閉店檢查項目
-const CLOSING_CHECKLIST = [
-  { id: 'electric_1', label: '高壓鍋電源已關閉', icon: '⚡' },
-  { id: 'electric_2', label: '電陶爐電源已關閉', icon: '⚡' },
-  { id: 'clean_1', label: '桌子與外場地板已清潔', icon: '🧹' },
-  { id: 'clean_2', label: '吧台內地板已清潔', icon: '🧹' },
-  { id: 'clean_3', label: '吧台檯面已擦拭', icon: '✨' },
-  { id: 'wash_1', label: '糖水罐已清洗', icon: '🧽' },
-  { id: 'wash_2', label: '製備器具已清洗歸位', icon: '🥣' },
-  { id: 'trash', label: '垃圾已傾倒並更換袋子', icon: '🗑️' },
-  { id: 'security', label: '大門已關閉鎖好', icon: '🔒' },
-];
-
 // 配合後台的 code 或 shift 欄位
+// 加入強制時間設定 (start/end)，用於覆蓋資料庫舊資料
 const SHIFT_TYPES = {
-  '早班': { color: 'bg-[#D4C5B0] text-[#4A3728]' },
-  '白班': { color: 'bg-[#E8DCC4] text-[#4A3728]' },
-  '晚班': { color: 'bg-[#4A3728] text-white' },
-  '早': { color: 'bg-[#D4C5B0] text-[#4A3728]' },
-  '中': { color: 'bg-[#E8DCC4] text-[#4A3728]' },
-  '晚': { color: 'bg-[#4A3728] text-white' },
+  '早班': { color: 'bg-[#D4C5B0] text-[#4A3728]', start: '08:00', end: '12:00' },
+  '白班': { color: 'bg-[#E8DCC4] text-[#4A3728]', start: '11:00', end: '15:00' },
+  '晚班': { color: 'bg-[#4A3728] text-white',   start: '15:00', end: '19:00' },
+  '早':   { color: 'bg-[#D4C5B0] text-[#4A3728]', start: '08:00', end: '12:00' },
+  '中':   { color: 'bg-[#E8DCC4] text-[#4A3728]', start: '11:00', end: '15:00' },
+  '晚':   { color: 'bg-[#4A3728] text-white',   start: '15:00', end: '19:00' },
   '全班': { color: 'bg-[#8B5E3C] text-white' },
   // 假別樣式
   '事假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
@@ -69,8 +57,8 @@ const SHIFT_TYPES = {
   '婚假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
   '特休': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
   '休假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '休': { color: 'bg-slate-100 text-slate-500' },
+  '假':   { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
+  '休':   { color: 'bg-slate-100 text-slate-500' },
 };
 
 const HOLIDAYS = { '2025-12-25': '聖誕節', '2025-01-01': '元旦' };
@@ -147,8 +135,8 @@ const LoginView = ({ onLogin, onGuestLogin }) => (
       <div className={`w-24 h-24 rounded-full ${THEME.primary} flex items-center justify-center mx-auto shadow-lg mb-4`}>
         <Briefcase size={40} className="text-white" />
       </div>
-      <h1 className={`text-3xl font-bold ${THEME.textMain}`}>煦煦小幫手 v3.7</h1>
-      <p className={`${THEME.textSub}`}>即時同步班表與薪資 (高可讀性版)</p>
+      <h1 className={`text-3xl font-bold ${THEME.textMain}`}>煦煦小幫手 v3.8</h1>
+      <p className={`${THEME.textSub}`}>即時同步班表與薪資 (班表校正版)</p>
     </div>
     <div className="w-full max-w-sm space-y-3">
       <button onClick={onLogin} className="w-full bg-white border border-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl shadow-sm hover:bg-slate-50 flex items-center justify-center gap-3">Google 登入</button>
@@ -432,7 +420,7 @@ const ScheduleView = ({ scheduleList, user, employeeName }) => {
                         else if (shiftName.includes('晚')) style = SHIFT_TYPES['晚班'].color;
                         else if (shiftName.includes('白') || shiftName.includes('中')) style = SHIFT_TYPES['白班'].color;
                         
-                        // 修正：同事班表不再變灰，保持原色，但移除「自己」的凸顯效果（陰影、邊框等）
+                        // 修正：同事班表不再變灰，保持原色，但移除「自己」的凸顯效果
                         const finalStyle = isMe ? (style || 'bg-slate-200') + ' border border-black/10 shadow-sm' : (style || 'bg-slate-200 opacity-90');
 
                         return (
@@ -505,8 +493,6 @@ const SalaryView = ({ workDuration, logs, scheduleList, employeeName }) => {
   );
 };
 
-// ... ClosingView & NoticesView ...
-// (這些元件保持與上一版相同，為節省篇幅在此略過，實際檔案中應包含)
 const ClosingView = ({ user, employeeName }) => {
   const [checks, setChecks] = useState({});
   const [log, setLog] = useState('');
@@ -598,20 +584,44 @@ export default function App() {
         }
     }, (e) => console.log('No employees collection found'));
 
+    // 2. 監聽 shifts - 修正：強制覆蓋舊時間
     const shiftsQ = query(collection(db, 'shifts')); 
     const unsubShifts = onSnapshot(shiftsQ, (snap) => {
       const parsedData = snap.docs.map(d => {
         const raw = d.data();
-        const parsedTime = parseTimeRange(raw.time); 
+        
+        // --- 強制校正邏輯開始 ---
+        // 優先讀取程式碼中的標準時間設定
+        const stdShift = SHIFT_TYPES[raw.shift] || SHIFT_TYPES[raw.type];
+        let startTime, endTime, hours;
+
+        if (stdShift && stdShift.start && stdShift.end) {
+            // 如果是標準班別（白/晚/早），強制使用新時間
+            startTime = stdShift.start;
+            endTime = stdShift.end;
+            
+            // 重新計算工時
+            const s = startTime.split(':').map(Number);
+            const e = endTime.split(':').map(Number);
+            hours = (e[0] + e[1]/60) - (s[0] + s[1]/60);
+        } else {
+            // 如果是非常規班別，才使用資料庫裡的 time 欄位
+            const parsedTime = parseTimeRange(raw.time);
+            startTime = parsedTime.start;
+            endTime = parsedTime.end;
+            hours = parsedTime.hours;
+        }
+        // --- 強制校正邏輯結束 ---
+
         return {
           id: d.id,
           date: raw.date,
           type: raw.shift, 
           shift: raw.shift, 
           name: raw.name,   
-          startTime: parsedTime.start,
-          endTime: parsedTime.end,
-          hours: parsedTime.hours,
+          startTime: startTime,
+          endTime: endTime,
+          hours: hours,
           isLeave: raw.shift && (raw.shift.includes('假') || raw.shift.includes('休'))
         };
       });
