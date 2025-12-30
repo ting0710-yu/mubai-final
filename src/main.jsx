@@ -1,745 +1,733 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { MapPin, Calendar as CalendarIcon, DollarSign, Bell, Briefcase, RefreshCw, User, LogOut, ChevronLeft, ChevronRight, Star, AlertCircle, History, X, Clock, CheckCircle2, XCircle, Database, Loader2, BadgeCheck, ClipboardCheck, FileText, Lock, Info } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import { 
+  BookOpen, 
+  Calculator, 
+  Package, 
+  HelpCircle, 
+  Wrench, 
+  Plus, 
+  Minus, 
+  Search, 
+  ChefHat,
+  Droplet,
+  Thermometer,
+  Info,
+  ShieldAlert,
+  ClipboardList,
+  Flame,
+  ArrowLeft,
+  Coffee,
+  Layers,
+  Sparkles,
+  Utensils,
+  RefreshCw,
+  Trash2,
+  Database,
+  Box,
+  Snowflake,
+  Milk,
+  Candy,
+  User,
+  History,
+  Lock,
+  KeyRound,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, signInWithCustomToken, signInAnonymously, updateProfile } from 'firebase/auth';
-import { getFirestore, collection, query, where, onSnapshot, addDoc, updateDoc, doc, orderBy, Timestamp, setDoc } from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot, 
+  updateDoc, 
+  increment,
+  query,
+  writeBatch,
+  getDocs,
+  addDoc
+} from 'firebase/firestore';
 
-// --- Firebase 初始化 ---
+// --- 1. Firebase 設定 ---
 const firebaseConfig = {
-  apiKey: "AIzaSyATncVLAIoz28OJxLKk4zHQInSfqOvCLik",
-  authDomain: "xuxu-helper.firebaseapp.com",
-  projectId: "xuxu-helper",
-  storageBucket: "xuxu-helper.firebasestorage.app",
-  messagingSenderId: "1022083747734",
-  appId: "1:1022083747734:web:e5ea9af8d1cbc8554e97b7",
-  measurementId: "G-8Q10D83PMQ"
+  apiKey: "AIzaSyB2chVdcyUo5VnAmdtsLtedYyxN2sevOMw",
+  authDomain: "mubai-20992.firebaseapp.com",
+  projectId: "mubai-20992",
+  storageBucket: "mubai-20992.firebasestorage.app",
+  messagingSenderId: "424210919088",
+  appId: "1:424210919088:web:431af5145383cca5815575",
+  measurementId: "G-D8BF48KC4N"
 };
 
-const app = initializeApp(firebaseConfig);
+// 初始化 Firebase (防止重複初始化)
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  // 忽略重複初始化錯誤
+}
+
 const auth = getAuth(app);
 const db = getFirestore(app);
+const appId = 'mubai-store'; // 固定資料庫路徑
 
-// --- 色票定義 ---
-const THEME = {
-  bg: 'bg-[#F9F7F2]',
-  card: 'bg-white',
-  primary: 'bg-[#8B5E3C]',
-  primaryHover: 'hover:bg-[#6F4B30]',
-  secondary: 'bg-[#D4C5B0]',
-  textMain: 'text-[#4A3728]',
-  textSub: 'text-[#8D7B68]',
-  border: 'border-[#E6E0D4]',
-  success: 'text-[#6B8E23]',
-  error: 'text-[#CD5C5C]',
-};
+// --- 2. 常數與資料設定 ---
+const STORE_PASSWORD = "8888";
+const SYRUP_IDS = ["syrup_manual", "sugar_water", "red_sugar_syrup", "mango_syrup"];
 
-// --- 設定 ---
-const SHOP_LOCATION = { lat: 25.039408, lng: 121.567066, name: "煦煦松仁店", address: "台北市信義區松仁路36號" };
-const ALLOWED_RADIUS = 500; 
-const HOURLY_WAGE = 210;
-const CLOCK_IN_WINDOW_MINUTES = 30; 
+// 配方資料
+const RECIPES = [
+  {
+    id: "syrup_manual", name: "手工糖漿", category: "topping", baseServings: 1, unit: "份 (標準鍋)",
+    steps: ["準備設備：電磁爐、厚底鍋、篩網、水壺。", "將全部材料放入鍋中。", "電磁爐開大火 3500 煮開。", "轉小火 800 續煮 15 分鐘。", "過程不需要攪拌，也不要蓋蓋子。", "煮好後過濾保存。"],
+    ingredients: [{ name: "黃冰糖", amount: 1600, unit: "g" }, { name: "麥芽糖", amount: 80, unit: "g" }, { name: "熱水", amount: 1680, unit: "g" }, { name: "檸檬汁", amount: 12, unit: "g" }],
+    equipment: "電磁爐、厚底鍋、篩網、水壺", notes: "過程不攪拌、不蓋蓋子", storage: "冷藏保存"
+  },
+  {
+    id: "sugar_water", name: "糖水", category: "topping", baseServings: 1, unit: "份",
+    steps: ["準備設備", "材料混合加熱至溶解"],
+    ingredients: [{ name: "熱水", amount: 500, unit: "g" }, { name: "砂糖", amount: 400, unit: "g" }, { name: "檸檬汁", amount: 0.5, unit: "g" }],
+    equipment: "電磁爐、厚底鍋", notes: "簡單混合加熱", storage: "冷藏"
+  },
+  {
+    id: "red_sugar_syrup", name: "紅糖漿", category: "topping", baseServings: 1, unit: "份",
+    steps: ["炒化糖", "煮沸", "轉小火"],
+    ingredients: [{ name: "片紅糖", amount: 140, unit: "g" }, { name: "黑糖", amount: 60, unit: "g" }, { name: "熱水", amount: 200, unit: "g" }, { name: "檸檬汁", amount: 0.6, unit: "g" }],
+    equipment: "厚底鍋", notes: "需炒化", storage: "冷藏"
+  },
+  { id: "mango_syrup", name: "芒果漿", category: "topping", baseServings: 1, unit: "份", steps: ["所有材料混合均勻"], ingredients: [{ name: "淺色芒果漿", amount: 350, unit: "g" }, { name: "手工糖漿", amount: 20, unit: "g" }, { name: "水", amount: 10, unit: "g" }, { name: "檸檬水", amount: 0.6, unit: "g" }], equipment: "水壺", notes: "不耐放", storage: "冷藏" },
+  { id: "lotus_seeds", name: "蓮子", category: "topping", baseServings: 1, unit: "份", steps: ["放入蒸架、放入鍋中", "閉氣煮13分鐘"], ingredients: [{ name: "蓮子", amount: 1000, unit: "g" }, { name: "砂糖", amount: 300, unit: "g" }, { name: "水", amount: 2600, unit: "適量" }], equipment: "高壓鍋", notes: "閉氣壓", storage: "糖水保存" },
+  { id: "lotus_root", name: "蓮藕片", category: "topping", baseServings: 1, unit: "份", steps: ["蓮藕切片1公分厚，全部材料放入高壓鍋", "有聲音後25分鐘，關火洩氣", "再翻炒收汁約30分鐘", "3200大火煮掉一半水", "轉中火1200煮至粘稠"], ingredients: [{ name: "蓮藕", amount: 1500, unit: "g" }, { name: "砂糖", amount: 135, unit: "g" }, { name: "片紅糖", amount: 105, unit: "g" }, { name: "水", amount: 1500, unit: "g" }], equipment: "高壓鍋", notes: "收汁", storage: "冷藏" },
+  { id: "barley", name: "薏仁", category: "topping", baseServings: 1, unit: "份", steps: ["所有材料放置高壓鍋煮", "有聲音後30分鐘", "洩氣瀝乾水"], ingredients: [{ name: "薏仁", amount: 1000, unit: "g" }, { name: "水", amount: 4500, unit: "g" }, { name: "砂糖", amount: 200, unit: "g" }], equipment: "高壓鍋", notes: "閉氣", storage: "瀝乾" },
+  { id: "chestnut", name: "栗子", category: "topping", baseServings: 1, unit: "份", steps: ["水沒過栗子加入冰糖", "大火3500煮沸轉1600煮20分鐘"], ingredients: [{ name: "栗子", amount: 2500, unit: "g" }, { name: "黃冰糖", amount: 500, unit: "g" }], equipment: "鍋", notes: "撈浮沫", storage: "原湯" },
+  { id: "red_bean", name: "紅豆 (顆粒)", category: "topping", baseServings: 1, unit: "份", steps: ["所有材料放入高壓鍋，有聲音後25分鐘", "關閉悶10分鐘"], ingredients: [{ name: "紅豆", amount: 400, unit: "g" }, { name: "砂糖", amount: 120, unit: "g" }, { name: "水", amount: 1170, unit: "g" }, { name: "檸檬汁", amount: 1, unit: "g" }], equipment: "高壓鍋", notes: "常溫浸泡", storage: "瀝乾" },
+  { id: "red_bean_paste", name: "紅豆沙", category: "base", baseServings: 1, unit: "份", steps: ["除了陳皮外其餘材料放入高壓鍋，有聲音後煮25分鐘", "再加1500水再煮25分鐘，悶十分鐘後放入陳皮", "取一半紅豆少部分水用破壁機打成泥狀，再倒回去拌勻"], ingredients: [{ name: "紅豆", amount: 400, unit: "g" }, { name: "砂糖", amount: 100, unit: "g" }, { name: "水", amount: 2000, unit: "g" }, { name: "檸檬汁", amount: 20, unit: "g" }, { name: "陳皮", amount: 3, unit: "g" }], equipment: "高壓鍋", notes: "綿密", storage: "當天" },
+  { id: "cassava", name: "木薯", category: "topping", baseServings: 1, unit: "份", steps: ["所有材料放置高壓鍋煮，有聲音後90分鐘"], ingredients: [{ name: "木薯", amount: 200, unit: "g" }, { name: "水", amount: 800, unit: "g" }, { name: "砂糖", amount: 50, unit: "g" }, { name: "片紅糖", amount: 50, unit: "g" }], equipment: "高壓鍋", notes: "閉氣", storage: "原湯" },
+  { id: "taro_chunks", name: "芋頭塊", category: "topping", baseServings: 1, unit: "份", steps: ["所有材料放進高壓鍋，聽到聲音12分鐘", "洩氣後馬上攤涼"], ingredients: [{ name: "芋頭塊", amount: 400, unit: "g" }, { name: "砂糖", amount: 100, unit: "g" }, { name: "片紅糖", amount: 30, unit: "g" }, { name: "水", amount: 1000, unit: "g" }], equipment: "高壓鍋", notes: "放氣", storage: "冷藏" },
+  { id: "sticky_rice_balls", name: "糯米球", category: "topping", baseServings: 1, unit: "份", steps: ["白糯米、紫米先浸泡", "高壓鍋25分鐘", "洩氣後倒入砂糖快速拌勻"], ingredients: [{ name: "水", amount: 500, unit: "g" }, { name: "白糯米", amount: 75, unit: "g" }, { name: "紫米", amount: 150, unit: "g" }, { name: "砂糖", amount: 20, unit: "g" }], equipment: "高壓鍋", notes: "預泡", storage: "冷藏" },
+  { id: "taro_paste", name: "芋泥", category: "topping", baseServings: 1, unit: "份", steps: ["芋泥蒸軟，放置盆中倒入黃油，用餘溫拌開", "再加入其他材料用打蛋器打勻", "不超過五分鐘"], ingredients: [{ name: "芋泥(蒸熟)", amount: 1500, unit: "g" }, { name: "砂糖", amount: 145, unit: "g" }, { name: "淡奶", amount: 290, unit: "g" }, { name: "牛奶", amount: 300, unit: "g" }, { name: "黃油", amount: 36, unit: "g" }, { name: "煉乳", amount: 55, unit: "g" }, { name: "紫薯粉", amount: 7, unit: "g" }], equipment: "蒸籠", notes: "勤做", storage: "平盤" },
+  { id: "mochi_milk", name: "鮮奶米麻薯", category: "topping", baseServings: 1, unit: "份", steps: ["材料混合均勻，用小火1600攪拌", "兩分鐘粘稠後關火，放入糯米攪拌均勻"], ingredients: [{ name: "木薯澱粉", amount: 20, unit: "g" }, { name: "糯米粉", amount: 80, unit: "g" }, { name: "砂糖", amount: 20, unit: "g" }, { name: "牛奶", amount: 250, unit: "g" }, { name: "鮮奶油", amount: 75, unit: "g" }, { name: "鹽", amount: 1, unit: "g" }, { name: "糯米(熟)", amount: 60, unit: "g" }], equipment: "鍋", notes: "不停攪拌", storage: "常溫" },
+  { id: "sweet_potato_chunks", name: "地瓜塊", category: "topping", baseServings: 1, unit: "份", steps: ["放入鍋中、放入片糖", "水沫過地瓜", "水滾煮7分鐘"], ingredients: [{ name: "地瓜", amount: 500, unit: "g" }, { name: "紅片糖", amount: 92, unit: "g" }, { name: "水", amount: 2000, unit: "g" }], equipment: "鍋子", notes: "閉氣", storage: "湯保存" },
+  { id: "oat_grains", name: "燕麥粒", category: "topping", baseServings: 1, unit: "份", steps: ["所有材料進高壓鍋，放氣30分鐘"], ingredients: [{ name: "燕麥粒", amount: 250, unit: "g" }, { name: "砂糖", amount: 50, unit: "g" }, { name: "水", amount: 1500, unit: "g" }], equipment: "高壓鍋", notes: "放氣", storage: "-" },
+  { id: "tofu_skin", name: "腐皮", category: "topping", baseServings: 1, unit: "份", steps: ["洗淨煮兩遍"], ingredients: [{ name: "乾腐皮", amount: 200, unit: "g" }], equipment: "鍋", notes: "換水", storage: "冷水" },
+  
+  // Bases
+  { id: "soy_milk_base", name: "豆漿湯底", category: "base", baseServings: 1, unit: "份", steps: ["混合加熱"], ingredients: [{ name: "豆漿", amount: 390, unit: "g" }, { name: "黃冰糖", amount: 16, unit: "g" }], equipment: "鍋", notes: "糖化", storage: "冷藏" },
+  { id: "milk_soup_base", name: "鮮奶湯底", category: "base", baseServings: 1, unit: "份", steps: ["所有材料拌勻"], ingredients: [{ name: "牛奶", amount: 3000, unit: "g" }, { name: "手工糖漿", amount: 250, unit: "g" }, { name: "咖奶", amount: 300, unit: "g" }, { name: "淡奶油", amount: 300, unit: "g" }, { name: "水", amount: 750, unit: "g" }], equipment: "壺", notes: "混合", storage: "冷藏" },
+  { id: "white_fungus_base", name: "銀耳湯底", category: "base", baseServings: 1, unit: "份", steps: ["銀耳先泡水一小時，洗淨", "大火3500煮40分鐘", "銀耳水持平就要補水1000-1500cc，每次補水前打蛋器打發"], ingredients: [{ name: "銀耳", amount: 70, unit: "g" }, { name: "砂糖", amount: 600, unit: "g" }, { name: "水", amount: 2000, unit: "g" }, { name: "補水", amount: 1500, unit: "g" }], equipment: "鍋", notes: "補水", storage: "冷藏" },
+  { id: "coconut_milk_base_a", name: "椰奶湯底 A", category: "base", baseServings: 1, unit: "份", steps: ["水、椰子粉、砂糖先煮化", "加入椰漿、牛奶拌勻即可"], ingredients: [{ name: "水", amount: 120, unit: "g" }, { name: "椰子粉", amount: 50, unit: "g" }, { name: "砂糖", amount: 6, unit: "g" }, { name: "椰漿", amount: 5, unit: "g" }, { name: "牛奶", amount: 20, unit: "g" }], equipment: "鍋", notes: "煮粉", storage: "冷藏" },
+  { id: "coconut_milk_base_b", name: "椰奶湯底 B", category: "base", baseServings: 1, unit: "份", steps: ["全部材料混合即可"], ingredients: [{ name: "淡奶油", amount: 90, unit: "g" }, { name: "椰漿", amount: 90, unit: "g" }, { name: "牛奶", amount: 150, unit: "g" }, { name: "旺仔", amount: 200, unit: "g" }, { name: "手工糖漿", amount: 10, unit: "g" }], equipment: "壺", notes: "混合", storage: "冷藏" },
+  { id: "milk_tea_base", name: "奶茶湯底", category: "base", baseServings: 1, unit: "份", steps: ["茶葉＋熱水取茶湯，悶泡10分", "將其餘材料混即可"], ingredients: [{ name: "阿薩姆茶葉", amount: 6, unit: "g" }, { name: "熱水", amount: 300, unit: "g" }, { name: "牛奶", amount: 60, unit: "g" }, { name: "砂糖", amount: 30, unit: "g" }, { name: "黑白淡奶", amount: 70, unit: "g" }, { name: "奶咖", amount: 40, unit: "g" }, { name: "紅糖漿", amount: 20, unit: "g" }], equipment: "壺", notes: "悶泡", storage: "冷藏" },
+  { id: "grass_jelly_base", name: "仙草湯底", category: "base", baseServings: 1, unit: "份", steps: ["茶葉＋熱水取茶湯，悶泡10分", "將其餘材料混即可"], ingredients: [{ name: "阿薩姆茶葉", amount: 6, unit: "g" }, { name: "熱水", amount: 300, unit: "g" }, { name: "牛奶", amount: 60, unit: "g" }, { name: "砂糖", amount: 30, unit: "g" }, { name: "黑白淡奶", amount: 70, unit: "g" }, { name: "奶咖", amount: 40, unit: "g" }, { name: "紅糖漿", amount: 25, unit: "g" }, { name: "仙草汁", amount: 2, unit: "g" }], equipment: "壺", notes: "混合", storage: "冷藏" },
+  { id: "coconut_juice_milk", name: "椰汁椰奶", category: "base", baseServings: 1, unit: "份", steps: ["椰肉、椰水、水、糖先用破壁機30秒打勻", "再加入其他材料拌勻"], ingredients: [{ name: "新鮮椰肉", amount: 120, unit: "g" }, { name: "椰水", amount: 200, unit: "g" }, { name: "水", amount: 100, unit: "g" }, { name: "砂糖", amount: 5, unit: "g" }, { name: "椰漿", amount: 15, unit: "g" }, { name: "牛奶", amount: 40, unit: "g" }, { name: "煉乳", amount: 10, unit: "g" }], equipment: "破壁機", notes: "打勻", storage: "冷藏" },
+  { id: "double_skin_milk", name: "皺皮奶", category: "base", baseServings: 1, unit: "份", steps: ["待更新"], ingredients: [{ name: "紅皮雞蛋(全蛋)", amount: 125, unit: "g" }, { name: "蛋清", amount: 295, unit: "g" }, { name: "牛奶", amount: 1260, unit: "g" }, { name: "淡奶油", amount: 32.5, unit: "g" }, { name: "砂糖", amount: 75, unit: "g" }], equipment: "烤箱", notes: "烤溫", storage: "冷藏" },
+  { id: "double_skin_jelly", name: "雙皮奶凍花", category: "base", baseServings: 1, unit: "份", steps: ["吉利丁泡冷水軟化五分鐘", "其餘材料加熱至55度關火", "加入泡好的吉利丁攪拌均勻倒入模具"], ingredients: [{ name: "牛奶", amount: 300, unit: "g" }, { name: "砂糖", amount: 30, unit: "g" }, { name: "淡奶油", amount: 120, unit: "g" }, { name: "吉利丁", amount: 10, unit: "g" }], equipment: "鍋", notes: "溫度", storage: "冷凍" },
+  { id: "creme_brulee", name: "焦糖布蕾", category: "base", baseServings: 1, unit: "份", steps: ["牛奶、淡奶油小火2000加熱至60度關火", "慢慢倒入布丁粉攪拌到無顆粒再加熱至80度關火", "倒入模具放涼冷藏"], ingredients: [{ name: "牛奶", amount: 400, unit: "g" }, { name: "淡奶油", amount: 400, unit: "g" }, { name: "布丁粉", amount: 100, unit: "g" }], equipment: "鍋", notes: "溫度", storage: "冷藏" },
+  { id: "tofu_pudding", name: "豆酪", category: "base", baseServings: 1, unit: "份", steps: ["先將豆漿粉、蒟蒻粉、糖混合均勻備用", "水加熱到80-90度，關火", "倒入粉類拌勻，浸泡十分鐘", "再將淡奶油、牛奶倒入混合開火2000", "加熱到80度關火，過篩後倒入模具", "倒入模具放涼冷藏"], ingredients: [{ name: "蒟蒻粉", amount: 48, unit: "g" }, { name: "豆漿粉", amount: 300, unit: "g" }, { name: "熱水", amount: 1680, unit: "g" }, { name: "牛奶", amount: 1080, unit: "g" }, { name: "淡奶油", amount: 180, unit: "g" }, { name: "砂糖", amount: 120, unit: "g" }], equipment: "鍋", notes: "混合", storage: "冷藏" },
+  { id: "autumn_pear", name: "秋冬梨", category: "base", baseServings: 1, unit: "份", steps: ["所有材料放入高壓鍋，水沒過梨", "聽到聲音後計時20分鐘", "放涼後進冰箱"], ingredients: [{ name: "鴨梨", amount: 9, unit: "顆" }, { name: "黃冰糖", amount: 150, unit: "g" }, { name: "水", amount: 1500, unit: "g" }], equipment: "高壓鍋", notes: "不可回冰", storage: "冷藏" },
+  { id: "sesame_paste", name: "芝麻糊", category: "base", baseServings: 1, unit: "份", steps: ["除了糖外將其他材料放入破壁機中高速打5-8分鐘", "過濾後再加入砂糖放入鍋中加熱", "約五分鐘可糊化"], ingredients: [{ name: "水", amount: 1100, unit: "g" }, { name: "熟黑芝麻", amount: 120, unit: "g" }, { name: "白糯米", amount: 50, unit: "g" }, { name: "砂糖", amount: 70, unit: "g" }], equipment: "破壁機", notes: "現做", storage: "保溫" },
+  { id: "water_chestnut", name: "馬蹄沙", category: "base", baseServings: 1, unit: "份", steps: ["馬蹄切碎備用", "750g水、黃片糖加熱煮化糖，加入馬蹄煮沸", "將芡水慢慢倒入攪勻", "隔冰水降溫"], ingredients: [{ name: "馬蹄", amount: 200, unit: "g" }, { name: "水", amount: 750, unit: "g" }, { name: "黃片糖", amount: 150, unit: "g" }, { name: "馬蹄粉", amount: 15, unit: "g" }], equipment: "鍋", notes: "降溫", storage: "冷藏" },
+  { id: "aunt_drink", name: "姨媽熱飲", category: "base", baseServings: 1, unit: "份", steps: ["取茶湯250g，將所有材料拌勻即可", "出品可加玫瑰花瓣、紅棗片、枸杞等"], ingredients: [{ name: "阿薩姆紅茶", amount: 5, unit: "g" }, { name: "熱水", amount: 300, unit: "g" }, { name: "牛奶", amount: 90, unit: "g" }, { name: "奶咖", amount: 25, unit: "g" }, { name: "黑糖漿", amount: 20, unit: "g" }, { name: "薑汁", amount: 10, unit: "g" }], equipment: "鍋", notes: "現點現做", storage: "現做" }
+];
 
-// 配合後台的 code 或 shift 欄位
-// 加入強制時間設定 (start/end)，用於覆蓋資料庫舊資料
-const SHIFT_TYPES = {
-  '早班': { color: 'bg-[#D4C5B0] text-[#4A3728]', start: '08:00', end: '12:00' },
-  '白班': { color: 'bg-[#E8DCC4] text-[#4A3728]', start: '11:00', end: '15:00' },
-  '晚班': { color: 'bg-[#4A3728] text-white',   start: '15:00', end: '19:00' },
-  '早':   { color: 'bg-[#D4C5B0] text-[#4A3728]', start: '08:00', end: '12:00' },
-  '中':   { color: 'bg-[#E8DCC4] text-[#4A3728]', start: '11:00', end: '15:00' },
-  '晚':   { color: 'bg-[#4A3728] text-white',   start: '15:00', end: '19:00' },
-  '全班': { color: 'bg-[#8B5E3C] text-white' },
-  // 假別樣式
-  '事假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '病假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '公假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '喪假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '婚假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '特休': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '休假': { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '假':   { color: 'bg-rose-50 text-rose-600 border border-rose-200' },
-  '休':   { color: 'bg-slate-100 text-slate-500' },
-};
+const DRY_GOODS_DATA = [
+  { name: "【乾貨】砂糖", unit: "包(1kg)", category: "dry_sugar" },
+  { name: "【乾貨】紅片糖", unit: "箱(10kg)", category: "dry_sugar" },
+  { name: "【乾貨】麥芽糖", unit: "罐", category: "dry_sugar" },
+  { name: "【乾貨】黑糖", unit: "包", category: "dry_sugar" },
+  { name: "【乾貨】冰糖", unit: "包", category: "dry_sugar" },
+  { name: "【乾貨】鹽", unit: "包", category: "dry_sugar" },
+  { name: "【乾貨】糯米粉", unit: "包", category: "dry_sugar" },
+  { name: "【乾貨】木薯粉", unit: "包", category: "dry_sugar" },
+  { name: "【乾貨】豆漿(原液)", unit: "罐", category: "dry_dairy" },
+  { name: "【乾貨】鮮奶油", unit: "罐", category: "dry_dairy" },
+  { name: "【乾貨】牛奶", unit: "罐", category: "dry_dairy" },
+  { name: "【乾貨】生木薯", unit: "袋", category: "dry_frozen" },
+  { name: "【乾貨】生蓮藕片", unit: "袋", category: "dry_frozen" },
+  { name: "【乾貨】生芋圓", unit: "包", category: "dry_frozen" },
+  { name: "【乾貨】生湯圓", unit: "包", category: "dry_frozen" },
+  { name: "【乾貨】芋泥包", unit: "包", category: "dry_frozen" },
+  { name: "【乾貨】薏仁", unit: "袋(50斤)", category: "dry_pantry" },
+  { name: "【乾貨】紅豆", unit: "袋(50斤)", category: "dry_pantry" },
+  { name: "【乾貨】燕麥粒", unit: "袋(50斤)", category: "dry_pantry" },
+  { name: "【乾貨】圓糯米", unit: "袋(50斤)", category: "dry_pantry" },
+  { name: "【乾貨】紫米", unit: "袋(50斤)", category: "dry_pantry" },
+  { name: "【乾貨】蓮子", unit: "包(450g)", category: "dry_pantry" },
+  { name: "【乾貨】芝麻", unit: "包(500g)", category: "dry_pantry" },
+  { name: "【乾貨】銀耳碎", unit: "包(500g)", category: "dry_pantry" },
+  { name: "【乾貨】乾豆皮", unit: "包", category: "dry_pantry" },
+  { name: "【乾貨】紅棗", unit: "包", category: "dry_pantry" },
+  { name: "【乾貨】枸杞", unit: "包", category: "dry_pantry" },
+  { name: "【乾貨】陳皮", unit: "包", category: "dry_pantry" }
+];
 
-const HOLIDAYS = { '2025-12-25': '聖誕節', '2025-01-01': '元旦' };
+const QA_DATA = [
+  { q: "紅豆煮不爛怎麼辦？", a: "請確保紅豆有提前浸泡至少 4 小時。煮的時候水要滾才下豆，加水只能加熱水。" },
+  { q: "客人反映糖水太甜？", a: "請確認配方比例。若標準比例仍覺得甜，可提供少量溫開水。" },
+  { q: "雪耳不出膠怎麼辦？", a: "剪碎一點，小火慢燉不少於 1.5 小時。" },
+  { q: "外帶杯蓋蓋不緊？", a: "擦拭杯緣後再蓋，或更換杯蓋。" }
+];
 
-// --- 工具函式 ---
-const getTaiwanDateStr = () => {
-  const d = new Date();
-  return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-};
+const OPENING_SOP = ["一到店換裝整理儀容", "開工作燈、開冷氣", "基本環境檢查", "檢查吧台、操作台", "確認冰箱溫度", "洗手、戴手套", "看今日清單"];
+const PRESSURE_COOKER_SAFETY = ["禁止手提鍋蓋移動。", "務必等待洩氣完畢。", "清洗洩壓閥。", "擦乾鍋外。", "氣壓閥未立起請通報。", "禁止煮濃稠/易溢出食材。", "內容物不可超過一半。", "嚴重警告：不當使用恐致爆炸。"];
+const WORK_ENVIRONMENT_RULES = ["擦拭高壓鍋外觀。", "工作區無糖漬。", "地板乾燥。", "隨手清洗器具。"];
+const STOVE_CLEANING_GUIDE = [{ title: "清潔工具", desc: "陶瓷/塑膠用海綿，鐵鍋用鋼刷。" }, { title: "電磁爐", desc: "保持通風，面板不燙時擦拭。" }, { title: "電陶爐", desc: "務必冷卻後用濕布擦拭。" }];
+const EQUIPMENT_DATA = [
+  { id: 2, name: "平冷冰箱", cycle: "每週", task: "清洗內外，檢查溫度。" },
+  { id: 3, name: "淨水器", cycle: "每月", task: "檢查濾芯顏色。" },
+  { id: 5, name: "製冰機", cycle: "每月", task: "拆洗濾網。" },
+  { id: 6, name: "直立式冰箱", cycle: "每週", task: "檢查並倒掉接水盤積水。" }
+];
 
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3; 
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
+// --- 3. 元件定義 (Components) ---
 
-const formatCurrency = (amount) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(amount);
-
-const calculateBonus = (hours) => {
-  if (hours >= 160) return 2000;
-  if (hours >= 120) return 1500;
-  if (hours >= 80) return 1000;
-  if (hours >= 40) return 500;
-  return 0;
-};
-
-const getTimeOnDate = (dateStr, timeStr) => {
-  if (!timeStr || timeStr === '-') return null;
-  const d = new Date(dateStr);
-  const [h, m] = timeStr.split(':');
-  d.setHours(parseInt(h), parseInt(m), 0, 0);
-  return d;
-};
-
-const parseTimeRange = (timeStr) => {
-  if (!timeStr || !timeStr.includes('-')) return { start: '00:00', end: '00:00', hours: 0 };
-  const [start, end] = timeStr.split('-');
-  const s = start.split(':').map(Number);
-  const e = end.split(':').map(Number);
-  const startH = s[0] + s[1]/60;
-  const endH = e[0] + e[1]/60;
-  let h = endH - startH;
-  if (h < 0) h += 24; 
-  return { start, end, hours: h };
-};
-
-const calculateEffectiveHours = (log, scheduleList, userName) => {
-  if (!log.startTime || !log.endTime) return 0;
-  const logDateStr = new Date(log.startTime).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-  const myShift = scheduleList.find(s => s.date === logDateStr && s.name === userName);
-  if (!myShift || myShift.isLeave) return 0;
-  const shiftStart = getTimeOnDate(logDateStr, myShift.startTime);
-  const shiftEnd = getTimeOnDate(logDateStr, myShift.endTime);
-  if (!shiftStart || !shiftEnd) return 0;
-  const logStart = new Date(log.startTime);
-  const logEnd = new Date(log.endTime);
-  const effectiveStart = logStart < shiftStart ? shiftStart : logStart;
-  const effectiveEnd = logEnd > shiftEnd ? shiftEnd : logEnd;
-  if (effectiveEnd <= effectiveStart) return 0;
-  const diffMs = effectiveEnd - effectiveStart;
-  return diffMs / 1000 / 60 / 60;
-};
-
-// --- 子組件 ---
-
-const LoginView = ({ onLogin, onGuestLogin }) => (
-  <div className={`flex flex-col items-center justify-center h-full p-8 ${THEME.bg} space-y-8`}>
-    <div className="text-center space-y-2">
-      <div className={`w-24 h-24 rounded-full ${THEME.primary} flex items-center justify-center mx-auto shadow-lg mb-4`}>
-        <Briefcase size={40} className="text-white" />
-      </div>
-      <h1 className={`text-3xl font-bold ${THEME.textMain}`}>煦煦小幫手 v3.8</h1>
-      <p className={`${THEME.textSub}`}>即時同步班表與薪資 (班表校正版)</p>
-    </div>
-    <div className="w-full max-w-sm space-y-3">
-      <button onClick={onLogin} className="w-full bg-white border border-slate-200 text-slate-700 font-semibold py-3 px-4 rounded-xl shadow-sm hover:bg-slate-50 flex items-center justify-center gap-3">Google 登入</button>
-      <button onClick={onGuestLogin} className={`w-full ${THEME.primary} text-white font-semibold py-3 px-4 rounded-xl shadow-sm hover:opacity-90 flex items-center justify-center gap-2`}>訪客試用 (推薦)</button>
-    </div>
-    <div className="text-xs text-slate-400 text-center px-8">請確認已連線至正確的 Firebase 專案</div>
-  </div>
-);
-
-const HistoryModal = ({ logs, scheduleList, onClose, userName }) => {
+const ConfirmModal = ({ isOpen, onClose, onConfirm, message }) => {
+  if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className={`w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl h-[80vh] flex flex-col shadow-xl animate-in slide-in-from-bottom duration-300`}>
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className={`text-lg font-bold ${THEME.textMain}`}>打卡紀錄核對</h3>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {logs.length === 0 && <p className="text-center text-slate-400 py-4">尚無打卡紀錄</p>}
-          {logs.map((log) => {
-            const effective = log.endTime ? calculateEffectiveHours(log, scheduleList, userName) : 0;
-            const rawDuration = log.duration ? (log.duration / 3600) : 0;
-            const isValid = effective > 0;
-            const isRunning = !log.endTime;
-
-            return (
-              <div key={log.id} className={`bg-slate-50 p-3 rounded-xl border border-slate-100`}>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="text-sm font-bold text-slate-700">{new Date(log.startTime).toLocaleDateString()}</div>
-                  <div className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${isRunning ? 'bg-blue-100 text-blue-700' : isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {isRunning ? <Clock size={10}/> : isValid ? <CheckCircle2 size={10}/> : <XCircle size={10}/>}
-                    {isRunning ? '進行中' : isValid ? '有效' : '異常'}
-                  </div>
-                </div>
-                <div className="flex justify-between items-end text-xs">
-                  <div className="text-slate-500">
-                    <div>打卡: {new Date(log.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - {log.endTime ? new Date(log.endTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...'}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-slate-400 strike-through">原始: {rawDuration.toFixed(2)} hr</div>
-                    <div className={`font-bold text-sm ${isValid ? THEME.textMain : 'text-slate-400'}`}>核算: {effective.toFixed(2)} hr</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-xs p-6 border-2 border-amber-200">
+        <h3 className="text-lg font-bold text-stone-800 mb-3 text-center">確認操作</h3>
+        <p className="text-sm text-stone-600 mb-6 text-center">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-stone-200 text-stone-500 font-bold">取消</button>
+          <button onClick={onConfirm} className="flex-1 py-2 rounded-xl bg-amber-600 text-white font-bold shadow-lg">確定</button>
         </div>
       </div>
     </div>
   );
 };
 
-const ClockInView = ({ isClockedIn, clockInTime, onClockIn, onClockOut, workDuration, user, logs, scheduleList, isIdentified, employeeName }) => {
-  const [distance, setDistance] = useState(null);
-  const [loadingLocation, setLoadingLocation] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [showHistory, setShowHistory] = useState(false);
-  const [todayShifts, setTodayShifts] = useState([]);
+const EquipmentModule = () => {
+  return (
+    <div className="p-4 pb-24 max-w-md mx-auto space-y-8">
+      <section>
+        <h2 className="text-2xl font-bold text-amber-800 mb-4 flex items-center"><ClipboardList className="mr-2" /> 早晨開店 SOP</h2>
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-amber-100">
+          <ul className="space-y-3">
+            {OPENING_SOP.map((step, idx) => (
+              <li key={idx} className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full border-2 border-stone-300 flex-shrink-0 mt-0.5"></span>
+                <span className="text-stone-700 font-medium">{step}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    const todayStr = getTaiwanDateStr(); 
-    const shifts = scheduleList.filter(s => s.date === todayStr);
-    setTodayShifts(shifts);
-    return () => clearInterval(timer);
-  }, [scheduleList]);
+      <section>
+        <h2 className="text-xl font-bold text-amber-800 mb-3 flex items-center"><Sparkles className="mr-2" /> 工作環境與衛生規範</h2>
+        <div className="bg-amber-50 p-5 rounded-xl shadow-sm border border-amber-200">
+          <ul className="space-y-3 text-amber-900 text-sm leading-relaxed">
+            {WORK_ENVIRONMENT_RULES.map((rule, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
+                <span>{rule}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
-  const getLocation = () => {
-    setLoadingLocation(true);
-    if (!navigator.geolocation) { setLoadingLocation(false); return; }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const dist = calculateDistance(latitude, longitude, SHOP_LOCATION.lat, SHOP_LOCATION.lng);
-        setDistance(Math.round(dist));
-        setLoadingLocation(false);
-      },
-      () => setLoadingLocation(false)
-    );
+      <section>
+        <h2 className="text-xl font-bold text-red-700 mb-3 flex items-center"><ShieldAlert className="mr-2" /> 高壓鍋安全規範</h2>
+        <div className="bg-red-50 p-5 rounded-xl shadow-sm border border-red-200">
+          <ul className="space-y-3 text-red-900 text-sm leading-relaxed">
+            {PRESSURE_COOKER_SAFETY.map((rule, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0"></span>
+                <span>{rule}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold text-stone-700 mb-3 flex items-center"><Flame className="mr-2" /> 爐具使用與清潔</h2>
+        <div className="grid gap-3">
+          {STOVE_CLEANING_GUIDE.map((guide, idx) => (
+            <div key={idx} className="bg-white p-4 rounded-xl border border-stone-200">
+              <h3 className="font-bold text-stone-800 mb-1">{guide.title}</h3>
+              <p className="text-sm text-stone-600 whitespace-pre-line">{guide.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-xl font-bold text-stone-700 mb-3 flex items-center"><Wrench className="mr-2" /> 定期保養</h2>
+        <div className="grid gap-3">
+          {EQUIPMENT_DATA.map((eq) => (
+            <div key={eq.id} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-amber-500">
+              <div className="flex justify-between items-start mb-1">
+                <h3 className="font-bold text-stone-800">{eq.name}</h3>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-600">{eq.cycle}</span>
+              </div>
+              <p className="text-stone-600 text-xs">{eq.task}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+};
+
+const RecipeModule = () => {
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
+  const [multiplier, setMultiplier] = useState(1);
+  const [targetServings, setTargetServings] = useState(30);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('all');
+
+  const filteredRecipes = RECIPES.filter(r => {
+    const matchSearch = r.name.includes(searchTerm);
+    const matchCategory = filterCategory === 'all' || r.category === filterCategory;
+    return matchSearch && matchCategory;
+  });
+
+  const getBatchWeight = (recipe) => {
+    return recipe.ingredients.reduce((acc, curr) => {
+      if (curr.unit === 'g' || curr.unit === 'ml' || curr.unit.includes('g')) {
+        return acc + curr.amount;
+      }
+      return acc; 
+    }, 0);
   };
 
-  const simulateInStore = () => { setDistance(0); };
-
-  const myTodayShift = useMemo(() => todayShifts.find(s => s.name === employeeName), [todayShifts, employeeName]);
-
-  const checkClockInEligibility = () => {
-    if (!distance || distance > ALLOWED_RADIUS) return { valid: false, msg: '不在店鋪範圍內' };
-    if (!isIdentified) return { valid: false, msg: '系統無法辨識您的身分，請聯繫店長' };
-    if (todayShifts.length === 0) return { valid: false, msg: '今日全店無排班' };
-    if (!myTodayShift) return { valid: false, msg: `今日無您的排班 (${employeeName})` };
-    if (myTodayShift.isLeave) return { valid: false, msg: '今日您已請假' };
-
-    const now = new Date();
-    const shiftStart = getTimeOnDate(myTodayShift.date, myTodayShift.startTime);
-    const allowedStart = new Date(shiftStart);
-    allowedStart.setMinutes(allowedStart.getMinutes() - CLOCK_IN_WINDOW_MINUTES);
-    const shiftEnd = getTimeOnDate(myTodayShift.date, myTodayShift.endTime);
-
-    if (now < allowedStart) return { valid: false, msg: `太早了 (${allowedStart.toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'})}後)` };
-    if (now > shiftEnd) return { valid: false, msg: '班表已過' };
-    return { valid: true, msg: '可打卡' };
+  const getDisplayAmount = (ing, recipe, servings, mult) => {
+     const isBatchMode = SYRUP_IDS.includes(recipe.id);
+     let val = 0;
+     if (isBatchMode) {
+        val = ing.amount * mult;
+     } else {
+        const batchWeight = getBatchWeight(recipe);
+        let servingSize = recipe.category === 'base' ? 450 : 40;
+        const totalTargetWeight = servings * servingSize;
+        const ratio = batchWeight > 0 ? totalTargetWeight / batchWeight : 1;
+        val = ing.amount * ratio;
+     }
+     
+     if (ing.unit === 'g' || ing.unit === 'ml') {
+        if (val >= 1000) return (val/1000).toFixed(2) + " kg";
+        return Math.round(val);
+     }
+     return (val).toFixed(1);
   };
 
-  const eligibility = checkClockInEligibility();
-  const hours = Math.floor(workDuration / 3600);
-  const minutes = Math.floor((workDuration % 3600) / 60);
-  const seconds = workDuration % 60;
-
-  const handleClockInClick = () => {
-    if (eligibility.valid) { onClockIn(); } else { alert(`無法打卡：${eligibility.msg}`); }
+  const getDisplayUnit = (ing, val) => {
+      if ((ing.unit === 'g' || ing.unit === 'ml') && typeof val === 'string' && val.includes('kg')) return '';
+      return ing.unit;
   };
+
+  const isBatchMode = selectedRecipe && SYRUP_IDS.includes(selectedRecipe.id);
 
   return (
-    <div className={`flex flex-col h-full p-4 space-y-6 overflow-y-auto pb-24 ${THEME.bg}`}>
-      <div className={`${THEME.card} rounded-2xl p-6 shadow-sm border ${THEME.border}`}>
-        <div className="flex justify-between items-start mb-2">
-           <div className="flex items-center gap-2">
-             <div className={`w-8 h-8 rounded-full ${THEME.secondary} flex items-center justify-center text-white`}><User size={16}/></div>
-             <div className="flex flex-col">
-                <span className={`text-sm font-medium ${THEME.textMain}`}>{employeeName}</span>
-                {isIdentified ? 
-                  <span className="text-[10px] text-green-600 flex items-center gap-1"><BadgeCheck size={10}/> 已認證員工</span> :
-                  <span className="text-[10px] text-red-500">訪客 / 未配對員工</span>
-                }
+    <div className="p-4 pb-20 max-w-md mx-auto">
+      <h2 className="text-2xl font-bold text-amber-800 mb-4 flex items-center">
+        <ChefHat className="mr-2" /> 配方製作
+      </h2>
+
+      {!selectedRecipe ? (
+        <>
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setFilterCategory('all')} className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-colors ${filterCategory === 'all' ? 'bg-amber-600 text-white shadow-md' : 'bg-white border'}`}>全部</button>
+            <button onClick={() => setFilterCategory('base')} className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-1 ${filterCategory === 'base' ? 'bg-amber-600 text-white shadow-md' : 'bg-white border'}`}><Coffee size={16} /> 湯底</button>
+            <button onClick={() => setFilterCategory('topping')} className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-colors flex items-center justify-center gap-1 ${filterCategory === 'topping' ? 'bg-amber-600 text-white shadow-md' : 'bg-white border'}`}><Layers size={16} /> 小料</button>
+          </div>
+
+          <input className="w-full p-2 mb-4 border rounded-lg" placeholder="搜尋..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <div className="grid gap-3">{filteredRecipes.map(r => (
+            <button key={r.id} onClick={() => { setSelectedRecipe(r); setMultiplier(1); setTargetServings(30); }} className="bg-white p-4 rounded-xl shadow-sm border text-left">
+              <h3 className="font-bold text-lg">{r.name}</h3>
+              <p className="text-xs text-stone-500">標準: {r.unit}</p>
+            </button>
+          ))}</div>
+        </>
+      ) : (
+        <div className="bg-white rounded-xl shadow-lg border p-5 space-y-6">
+           <div className="flex justify-between items-center"><h3 className="font-bold text-xl">{selectedRecipe.name}</h3><button onClick={() => setSelectedRecipe(null)} className="bg-stone-100 px-3 py-1 rounded-full text-sm">返回</button></div>
+           
+           <div className="bg-amber-50 p-4 rounded-lg">
+             {isBatchMode ? (
+               <>
+                 <label className="block text-sm font-bold text-amber-800 mb-2 flex items-center"><Calculator size={16} className="mr-1"/> 製作倍率 (標準為 1 鍋)</label>
+                 <div className="flex items-center gap-2">
+                   <button onClick={() => setMultiplier(m => Math.max(0.25, m - 0.25))} className="w-10 h-10 flex items-center justify-center bg-white border border-amber-300 rounded-lg text-amber-600 font-bold">-</button>
+                   <input type="number" step="0.1" value={multiplier} onChange={(e) => setMultiplier(parseFloat(e.target.value) || 0)} className="flex-1 p-2 text-xl font-bold text-center border-2 border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 text-amber-900 bg-white" />
+                   <button onClick={() => setMultiplier(m => m + 0.25)} className="w-10 h-10 flex items-center justify-center bg-white border border-amber-300 rounded-lg text-amber-600 font-bold">+</button>
+                   <span className="font-medium text-stone-600 whitespace-nowrap">鍋/份</span>
+                 </div>
+               </>
+             ) : (
+               <>
+                 <label className="block text-sm font-bold text-amber-800 mb-2 flex items-center"><Calculator size={16} className="mr-1"/> 今日預計出餐份數 (人)</label>
+                 <div className="flex items-center gap-2 mb-2">
+                   <button onClick={() => setTargetServings(m => Math.max(1, m - 5))} className="w-10 h-10 flex items-center justify-center bg-white border border-amber-300 rounded-lg text-amber-600 font-bold">-5</button>
+                   <input type="number" value={targetServings} onChange={(e) => setTargetServings(parseInt(e.target.value) || 0)} className="flex-1 p-2 text-xl font-bold text-center border-2 border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 text-amber-900 bg白" />
+                   <button onClick={() => setTargetServings(m => m + 5)} className="w-10 h-10 flex items-center justify-center bg-white border border-amber-300 rounded-lg text-amber-600 font-bold">+5</button>
+                 </div>
+                 <div className="text-xs text-amber-700 text-center font-medium bg-amber-100 py-1 rounded">計算基準：{selectedRecipe.category === 'base' ? '每碗 450g' : '每份 40g'} × {targetServings} 人 = 總需 {((selectedRecipe.category === 'base' ? 450 : 40) * targetServings / 1000).toFixed(1)} kg</div>
+               </>
+             )}
+           </div>
+
+           <div>
+             <h4 className="font-bold text-stone-700 mb-3 border-b pb-1 flex items-center"><Package size={18} className="mr-1.5 text-amber-600"/> 所需食材 (已換算)</h4>
+             <ul className="space-y-2 bg-stone-50 p-3 rounded-lg">
+               {selectedRecipe.ingredients.map((ing, idx) => {
+                 const displayVal = getDisplayAmount(ing, selectedRecipe, targetServings, multiplier);
+                 return (
+                   <li key={idx} className="flex justify-between items-center py-1 border-b border-stone-200 last:border-0">
+                     <span className="text-stone-600 font-medium">{ing.name}</span>
+                     <span className="font-mono font-bold text-amber-700 text-lg">{displayVal}<small className="text-sm font-normal text-stone-500 ml-1">{getDisplayUnit(ing, displayVal)}</small></span>
+                   </li>
+                 );
+               })}
+             </ul>
+           </div>
+
+           {selectedRecipe.equipment && (
+             <div>
+               <h4 className="font-bold text-stone-700 mb-2 border-b pb-1 flex items-center"><Wrench size={18} className="mr-1.5 text-stone-500"/> 設備需求</h4>
+               <p className="text-sm text-stone-600 bg-stone-50 p-2 rounded border border-stone-100">{selectedRecipe.equipment}</p>
+             </div>
+           )}
+
+           <div>
+             <h4 className="font-bold text-stone-700 mb-3 border-b pb-1 flex items-center"><BookOpen size={18} className="mr-1.5 text-amber-600"/> 製作流程</h4>
+             <ol className="space-y-3">
+               {selectedRecipe.steps.map((step, idx) => (
+                 <li key={idx} className="flex gap-3 text-stone-700 text-sm leading-relaxed">
+                   <span className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs mt-0.5">{idx + 1}</span>
+                   <span>{step}</span>
+                 </li>
+               ))}
+             </ol>
+           </div>
+
+           <div className="grid grid-cols-2 gap-3">
+             <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+               <h5 className="font-bold text-blue-800 text-xs mb-1 flex items-center"><Info size={14} className="mr-1"/> 重點備註</h5>
+               <p className="text-xs text-blue-900 leading-snug">{selectedRecipe.notes || "無"}</p>
+             </div>
+             <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+               <h5 className="font-bold text-green-800 text-xs mb-1 flex items-center"><Thermometer size={14} className="mr-1"/> 保存方式</h5>
+               <p className="text-xs text-green-900 leading-snug">{selectedRecipe.storage || "詳見標準規範"}</p>
              </div>
            </div>
-           <button onClick={() => setShowHistory(true)} className={`text-xs flex items-center gap-1 ${THEME.textSub} hover:text-[#8B5E3C] px-2 py-1 rounded bg-slate-50`}>
-             <History size={14} /> 核對
-           </button>
-        </div>
-        <div className="text-center space-y-2 mt-2">
-          <h1 className={`text-5xl font-bold ${THEME.textMain} tabular-nums tracking-tight`}>{currentTime.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' })}</h1>
-          <p className={`${THEME.textSub} text-sm`}>{currentTime.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}</p>
-          
-          <div className="mt-4 flex flex-col gap-2">
-            {todayShifts.length > 0 ? (
-                todayShifts
-                .sort((a, b) => {
-                    if (a.name === employeeName) return -1;
-                    if (b.name === employeeName) return 1;
-                    const order = { '早班': 1, '早': 1, '白班': 2, '白': 2, '中': 2, '晚班': 3, '晚': 3 };
-                    const oA = order[a.shift] || 99;
-                    const oB = order[b.shift] || 99;
-                    return oA - oB;
-                })
-                .map((s, idx) => {
-                    const isMe = s.name === employeeName;
-                    return (
-                        <div key={idx} className={`flex justify-between items-center px-4 py-2 rounded-xl text-xs font-medium border ${isMe ? 'bg-[#8B5E3C] text-white border-[#8B5E3C] shadow-md transform scale-105' : 'bg-white text-slate-600 border-slate-200'}`}>
-                            <div className="flex items-center gap-2">
-                                {isMe && <Star size={10} className="text-yellow-300 fill-yellow-300"/>}
-                                <span className="font-bold text-sm">{s.name}</span>
-                            </div>
-                            <span>
-                                {s.isLeave ? s.shift : `${s.shift} (${s.startTime}-${s.endTime})`}
-                            </span>
-                        </div>
-                    );
-                })
-            ) : (
-                <div className="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-medium">今日全店無排班</div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className={`rounded-xl p-4 border bg-white ${THEME.border}`}>
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-2"><MapPin size={16} className={eligibility.valid ? THEME.success : THEME.textSub} /><span className={`font-medium ${THEME.textMain} text-sm`}>定位打卡</span></div>
-          <button onClick={getLocation} disabled={loadingLocation} className={`text-xs px-3 py-1.5 rounded-full border ${THEME.border} ${THEME.textMain} flex items-center gap-1 active:bg-slate-100`}>
-            <RefreshCw size={12} className={loadingLocation ? 'animate-spin' : ''} />{distance !== null ? '更新' : '偵測'}
-          </button>
+           <button onClick={() => setSelectedRecipe(null)} className="w-full mt-6 bg-stone-100 text-stone-600 py-3 rounded-xl font-bold hover:bg-stone-200 transition-colors flex items-center justify-center gap-2"><ArrowLeft size={20} /> 返回列表</button>
         </div>
-        <p className={`text-lg font-bold ${eligibility.valid || isClockedIn ? THEME.success : THEME.error}`}>{distance !== null ? `${distance} 公尺` : '--'} <span className="text-xs font-normal ml-2 opacity-70">{distance === null ? '' : (distance <= ALLOWED_RADIUS ? '(範圍內)' : '(太遠了)')}</span></p>
-        {!eligibility.valid && !isClockedIn && distance !== null && distance <= ALLOWED_RADIUS && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={10}/> {eligibility.msg}</p>}
-        {(!distance || distance > ALLOWED_RADIUS) && <button onClick={simulateInStore} className="mt-2 text-xs text-blue-400 underline w-full text-right">[測試] 模擬進店</button>}
-      </div>
-
-      <div className="flex-1 flex flex-col justify-center items-center py-4">
-        {!isClockedIn ? (
-          <button onClick={handleClockInClick} disabled={distance === null} className={`w-48 h-48 rounded-full flex flex-col items-center justify-center shadow-lg transition-all transform active:scale-95 border-4 ${eligibility.valid ? 'border-[#8B5E3C] bg-[#8B5E3C] text-white cursor-pointer' : 'border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
-            <Briefcase size={40} className="mb-2 opacity-90" />
-            <span className="text-2xl font-bold tracking-widest">上班</span>
-            {!eligibility.valid && distance !== null && distance <= ALLOWED_RADIUS && <span className="text-xs mt-1 opacity-70">未達打卡時間</span>}
-            {(distance === null || distance > ALLOWED_RADIUS) && <span className="text-xs mt-1 opacity-70">請先定位</span>}
-          </button>
-        ) : (
-          <div className="text-center w-full">
-            <div className={`w-48 h-48 mx-auto rounded-full bg-white border-4 border-[#8B5E3C] ${THEME.textMain} flex flex-col items-center justify-center shadow-xl mb-8 relative overflow-hidden`}>
-               <div className="absolute inset-0 bg-[#8B5E3C] opacity-5 animate-pulse rounded-full"></div>
-               <span className="text-xs text-[#8B5E3C] font-bold mb-1 tracking-widest uppercase">Working</span>
-               <span className="text-3xl font-mono font-bold tabular-nums">{hours.toString().padStart(2,'0')}:{minutes.toString().padStart(2,'0')}:{seconds.toString().padStart(2,'0')}</span>
-               <span className={`text-xs mt-2 ${THEME.textSub}`}>{new Date(clockInTime).toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'})}</span>
-            </div>
-            <button onClick={onClockOut} className={`w-full max-w-xs ${THEME.primary} text-white font-bold py-4 rounded-xl shadow-md hover:opacity-90`}>下班打卡</button>
-          </div>
-        )}
-      </div>
-      {showHistory && <HistoryModal logs={logs} scheduleList={scheduleList} onClose={() => setShowHistory(false)} employeeName={employeeName} />}
+      )}
     </div>
   );
 };
 
-const ScheduleView = ({ scheduleList, user, employeeName }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
-  const leaveStats = useMemo(() => {
-    const stats = { '事假': 0, '病假': 0, '生理假': 0, '喪假': 0 };
-    scheduleList.forEach(shift => { 
-        if (shift.name === employeeName && shift.shift && (shift.shift.includes('假') || shift.shift.includes('休'))) {
-            if (shift.shift.includes('事')) stats['事假'] = (stats['事假'] || 0) + 1;
-            else if (shift.shift.includes('病')) stats['病假'] = (stats['病假'] || 0) + 1;
-            else if (shift.shift.includes('喪')) stats['喪假'] = (stats['喪假'] || 0) + 1;
-            else stats['事假'] = (stats['事假'] || 0) + 1;
-        }
+const InventoryModule = ({ user, appId, operatorName }) => {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
+  const [confirmId, setConfirmId] = useState(null);
+  const [error, setError] = useState(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return; }
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'));
+    const unsub = onSnapshot(q, (snap) => {
+      setItems(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+      setError(null);
+    }, (err) => {
+      console.error(err);
+      setError("無法載入資料");
+      setLoading(false);
     });
-    return stats;
-  }, [scheduleList, employeeName]);
+    return () => unsub();
+  }, [user, appId]);
 
-  const calendarDays = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startDay = new Date(year, month, 1).getDay();
-    const days = [];
-    for (let i = 0; i < startDay; i++) days.push({ day: null });
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      days.push({ day: i, dateStr, isToday: new Date().toISOString().split('T')[0] === dateStr, isHoliday: HOLIDAYS[dateStr] || null });
-    }
-    return days;
-  }, [currentDate]);
-
-  const changeMonth = (d) => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + d, 1));
-  
-  const getShifts = (d) => {
-    const shifts = scheduleList.filter(s => s.date === d);
-    return shifts.sort((a, b) => {
-        const orderMap = { '早班': 1, '早': 1, '白班': 2, '白': 2, '中': 2, '晚班': 3, '晚': 3 };
-        const oA = orderMap[a.shift] || 99;
-        const oB = orderMap[b.shift] || 99;
-        return oA - oB;
+  const updateStock = async (id, delta, name, unit) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id), { quantity: increment(delta) });
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), {
+      timestamp: new Date().toISOString(), operator: operatorName, itemName: name, change: delta, unit: unit, action: 'update'
     });
   };
 
+  const zeroStock = async (id, name, unit) => {
+    if (confirmId === id) {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', id), { quantity: 0 });
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), { timestamp: new Date().toISOString(), operator: operatorName, itemName: name, change: '歸零', unit: unit, action: 'reset' });
+      setConfirmId(null);
+    } else {
+      setConfirmId(id);
+      setTimeout(() => setConfirmId(null), 3000);
+    }
+  };
+
+  const performReset = async () => {
+    setLoading(true);
+    setShowResetConfirm(false);
+    try {
+        const col = collection(db, 'artifacts', appId, 'public', 'data', 'inventory');
+        const snap = await getDocs(col);
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        
+        // Use FULL list for reset
+        [...RECIPES, ...DRY_GOODS_DATA].forEach(i => {
+           // Determine quantity logic: Dry goods have defaults, recipes (prepared) default to 0 or a safe prep amount
+           const qty = i.quantity || (i.category?.startsWith('dry') ? 5 : 0);
+           batch.set(doc(col), { name: i.name, quantity: qty, unit: i.unit, category: i.category || 'unknown' });
+        });
+        
+        await batch.commit();
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'logs'), { timestamp: new Date().toISOString(), operator: '系統', itemName: '全庫存', change: '重置', unit: '', action: 'reset' });
+    } catch (e) {
+        console.error("Reset failed", e);
+        setError("重置失敗");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const filtered = items.filter(i => {
+    const cat = i.category || 'unknown';
+    if (filter === 'all') return true;
+    if (['dry_sugar', 'dry_dairy', 'dry_frozen', 'dry_pantry'].includes(filter)) return cat === filter;
+    return cat === filter;
+  });
+
+  if (error) return <div className="p-10 text-center text-red-500">{error}</div>;
+
   return (
-    <div className={`p-4 pb-24 h-full overflow-y-auto ${THEME.bg}`}>
-      <div className="flex items-center justify-between mb-6 px-1">
-        <h2 className={`text-2xl font-bold ${THEME.textMain}`}>我的班表</h2>
-        <div className="flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm border border-[#E6E0D4]">
-          <button onClick={() => changeMonth(-1)} className={`p-1 ${THEME.textSub}`}><ChevronLeft size={20}/></button>
-          <span className={`text-sm font-semibold ${THEME.textMain} w-24 text-center`}>{currentDate.getFullYear()}年 {currentDate.getMonth() + 1}月</span>
-          <button onClick={() => changeMonth(1)} className={`p-1 ${THEME.textSub}`}><ChevronRight size={20}/></button>
-        </div>
+    <div className="p-4 pb-20 max-w-md mx-auto">
+      <div className="flex justify-between mb-4">
+        <h2 className="text-2xl font-bold text-amber-800 flex items-center"><Package className="mr-2"/> 庫存</h2>
+        <button onClick={() => setShowResetConfirm(true)} className="p-2 bg-red-100 text-red-600 rounded-full"><RefreshCw size={20}/></button>
       </div>
       
-      {/* 班別說明 Legend - 修正時間 */}
-      <div className="mb-4 px-2 py-2 bg-white/60 rounded-lg text-[10px] text-slate-500 flex flex-wrap gap-2 justify-center border border-slate-100">
-         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#D4C5B0]"></span>早班 8:00-12:00</span>
-         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#E8DCC4]"></span>白班 11:00-15:00</span>
-         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#4A3728]"></span>晚班 15:00-19:00</span>
+      <ConfirmModal isOpen={showResetConfirm} onClose={() => setShowResetConfirm(false)} onConfirm={performReset} message="確定要重置庫存嗎？這將會清空並重新匯入所有品項。" />
+
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar">
+        {['all', 'base', 'topping', 'dry_sugar', 'dry_dairy', 'dry_frozen', 'dry_pantry'].map(f => (
+          <button key={f} onClick={() => setFilter(f)} className={`whitespace-nowrap px-3 py-1 rounded-full text-sm ${filter === f ? 'bg-amber-600 text-white' : 'bg-white border'}`}>
+            {f === 'all' ? '全部' : f === 'base' ? '湯底' : f === 'topping' ? '小料' : f === 'dry_sugar' ? '糖/粉' : f === 'dry_dairy' ? '奶類' : f === 'dry_frozen' ? '冷凍' : '常溫'}
+          </button>
+        ))}
       </div>
 
-      <div className={`${THEME.card} rounded-2xl shadow-sm border ${THEME.border} overflow-hidden mb-6`}>
-        <div className="grid grid-cols-7 bg-[#F5F1E8] border-b border-[#E6E0D4]">{['日','一','二','三','四','五','六'].map((d,i)=><div key={i} className={`py-3 text-center text-xs font-bold ${i===0||i===6?'text-[#8B5E3C]':THEME.textSub}`}>{d}</div>)}</div>
-        <div className="grid grid-cols-7 min-h-[300px]">
-          {calendarDays.map((item, idx) => {
-            if(!item.day) return <div key={idx} className="bg-[#FCFAF7]"></div>;
-            const shifts = getShifts(item.dateStr);
+      {loading ? <div className="text-center py-10">載入中...</div> : (
+        <div className="space-y-3">
+          {filtered.map(item => {
+            const isBulk = item.unit && item.unit.includes('50斤');
+            const isDry = item.category && item.category.startsWith('dry_');
+            const isBase = item.category === 'base';
+            const isTopping = item.category === 'topping';
+            
             return (
-              <div key={idx} className={`min-h-[80px] border-t border-r border-slate-50 p-1 ${item.isToday?'bg-[#FFF9E6]':''}`}>
-                <div className="flex justify-between items-start"><span className={`text-xs w-6 h-6 flex items-center justify-center rounded-full ${item.isToday?'bg-[#8B5E3C] text-white':item.isHoliday?'text-[#CD5C5C]':THEME.textMain}`}>{item.day}</span>{item.isHoliday&&<span className="text-[10px] text-[#CD5C5C] font-bold scale-75 origin-top-right">{item.isHoliday}</span>}</div>
-                <div className="mt-1 space-y-1">
-                    {shifts.map((s,si) => {
-                        const isMe = s.name === employeeName;
-                        let style = null;
-                        const shiftName = s.shift ? s.shift.trim() : '';
-                        
-                        if (shiftName.includes('假') || shiftName.includes('休')) style = SHIFT_TYPES['假'].color;
-                        else if (shiftName.includes('早')) style = SHIFT_TYPES['早班'].color;
-                        else if (shiftName.includes('晚')) style = SHIFT_TYPES['晚班'].color;
-                        else if (shiftName.includes('白') || shiftName.includes('中')) style = SHIFT_TYPES['白班'].color;
-                        
-                        // 修正：同事班表不再變灰，保持原色，但移除「自己」的凸顯效果
-                        const finalStyle = isMe ? (style || 'bg-slate-200') + ' border border-black/10 shadow-sm' : (style || 'bg-slate-200 opacity-90');
-
-                        return (
-                            <div key={si} className={`text-[10px] rounded px-1 py-0.5 truncate flex flex-col ${finalStyle}`}>
-                                <span className="font-bold truncate text-[8px] flex items-center gap-1">
-                                    {isMe && <Star size={8} className="text-yellow-500 fill-yellow-500"/>}
-                                    {s.name}
-                                </span>
-                                <span className="opacity-90">{s.shift}</span>
-                            </div>
-                        );
-                    })}
+              <div key={item.id} className="bg-white p-3 rounded-xl border shadow-sm flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-stone-800">{item.name}</span>
+                  <span className="font-bold text-xl text-amber-800">{Number(item.quantity).toFixed(2).replace(/\.00$/, '')} <small className="text-xs text-stone-500">{item.unit}</small></span>
+                </div>
+                <div className="flex justify-end gap-2 items-center">
+                   <button onClick={() => zeroStock(item.id, item.name, item.unit)} className={`h-8 px-2 rounded flex items-center ${confirmId === item.id ? 'bg-red-600 text-white' : 'bg-stone-100 text-stone-400'}`}>{confirmId === item.id ? <span className="text-xs font-bold">確定?</span> : <Trash2 size={14}/>}</button>
+                   {isBulk ? (
+                     <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                       <button onClick={() => updateStock(item.id, -0.33, item.name, item.unit)} className="bg-stone-100 px-2 py-1 rounded text-xs whitespace-nowrap">-1/3</button>
+                       <button onClick={() => updateStock(item.id, -0.5, item.name, item.unit)} className="bg-stone-100 px-2 py-1 rounded text-xs whitespace-nowrap">-半</button>
+                       <button onClick={() => updateStock(item.id, -0.8, item.name, item.unit)} className="bg-stone-100 px-2 py-1 rounded text-xs whitespace-nowrap">-八分</button>
+                       <button onClick={() => updateStock(item.id, -1, item.name, item.unit)} className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-bold whitespace-nowrap">-1</button>
+                     </div>
+                   ) : isDry ? (
+                     <>
+                       <button onClick={() => updateStock(item.id, -1, item.name, item.unit)} className="bg-stone-100 w-8 h-8 rounded flex items-center justify-center font-bold">-1</button>
+                       <button onClick={() => updateStock(item.id, 1, item.name, item.unit)} className="bg-amber-100 w-8 h-8 rounded text-amber-800 flex items-center justify-center font-bold">+1</button>
+                     </>
+                   ) : (
+                     <button onClick={() => updateStock(item.id, isBase ? -200 : -40, item.name, item.unit)} className={`px-3 py-1 h-8 rounded text-sm font-bold flex items-center ${isBase ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                       -1{isBase ? '碗' : '份'}
+                     </button>
+                   )}
                 </div>
               </div>
             );
           })}
+          {filtered.length === 0 && items.length > 0 && <div className="text-center text-stone-400 mt-10">無此分類項目</div>}
+          {items.length === 0 && (
+              <div className="text-center py-10 bg-stone-50 rounded-lg border border-dashed border-stone-300">
+                  <p className="text-stone-500 mb-2">資料庫目前是空的</p>
+                  <button onClick={() => setShowResetConfirm(true)} className="text-amber-600 font-bold underline">點此匯入預設資料</button>
+              </div>
+          )}
         </div>
-      </div>
-      <div className={`${THEME.card} rounded-2xl shadow-sm border ${THEME.border} p-5`}>
-        <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2"><AlertCircle size={18} className="text-[#CD5C5C]" /><h3 className={`font-bold ${THEME.textMain}`}>請假統計 (僅計算您個人)</h3></div>
-        <div className="grid grid-cols-4 gap-2 text-center">{Object.entries(leaveStats).map(([t,c])=><div key={t} className="flex flex-col items-center"><span className={`text-2xl font-bold ${c>0?'text-[#CD5C5C]':'text-slate-300'}`}>{c}</span><span className="text-xs text-slate-500">{t}</span></div>)}</div>
-      </div>
+      )}
     </div>
   );
 };
 
-const SalaryView = ({ workDuration, logs, scheduleList, employeeName }) => {
-  const { earnedHours, futureHours, totalEstimatedHours } = useMemo(() => {
-    let earned = 0;
-    let future = 0;
-    logs.forEach(log => { if (log.endTime) { earned += calculateEffectiveHours(log, scheduleList, employeeName); } });
-    
-    const todayStr = getTaiwanDateStr();
-    scheduleList.forEach(shift => { 
-        if (shift.name === employeeName && shift.date > todayStr && !shift.isLeave) { 
-            future += parseFloat(shift.hours || 0); 
-        } 
-    });
-    return { earnedHours: earned, futureHours: future, totalEstimatedHours: earned + future };
-  }, [workDuration, logs, scheduleList, employeeName]);
-
-  const earnedSalary = Math.floor(earnedHours * HOURLY_WAGE);
-  const total = Math.floor(totalEstimatedHours * HOURLY_WAGE);
-  const bonus = calculateBonus(totalEstimatedHours);
-  const percent = Math.min((totalEstimatedHours / 160) * 100, 100);
-
-  return (
-    <div className={`p-4 pb-24 space-y-6 ${THEME.bg} h-full overflow-y-auto`}>
-      <h2 className={`text-2xl font-bold ${THEME.textMain} px-1`}>薪資核算</h2>
-      <div className={`relative overflow-hidden rounded-2xl p-6 text-white shadow-lg ${THEME.primary}`}>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full translate-x-10 -translate-y-10"></div>
-        <p className="text-[#D4C5B0] text-sm font-medium mb-1">本月預估 (含獎金)</p>
-        <h3 className="text-4xl font-bold mb-4 tracking-tight">{formatCurrency(total + bonus)}</h3>
-        <div className="flex gap-4 border-t border-white/20 pt-4">
-          <div className="flex-1 border-r border-white/20"><p className="text-xs text-[#D4C5B0] mb-0.5">有效工時薪資</p><p className="font-semibold text-lg">{formatCurrency(earnedSalary)}</p></div>
-          <div className="flex-1 pl-4"><p className="text-xs text-[#D4C5B0] mb-0.5">達標獎金</p><p className="font-semibold text-lg text-[#FFD700]">+{formatCurrency(bonus)}</p></div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-         <div className={`${THEME.card} p-4 rounded-xl shadow-sm border ${THEME.border}`}><p className="text-xs text-slate-500 mb-1">有效核算工時</p><p className={`text-xl font-bold ${THEME.textMain}`}>{earnedHours.toFixed(2)} <span className="text-xs font-normal">hr</span></p><p className="text-[10px] text-slate-400 mt-1">扣除早到/晚退/非排班</p></div>
-         <div className={`${THEME.card} p-4 rounded-xl shadow-sm border ${THEME.border}`}><p className="text-xs text-slate-500 mb-1">未來預排工時</p><p className={`text-xl font-bold ${THEME.textSub}`}>{futureHours.toFixed(1)} <span className="text-xs font-normal">hr</span></p><p className="text-[10px] text-slate-400 mt-1">您的未來排班</p></div>
-      </div>
-      <div className={`${THEME.card} p-5 rounded-2xl shadow-sm border ${THEME.border}`}>
-        <div className="flex justify-between items-center mb-3"><h4 className={`font-bold ${THEME.textMain} flex items-center gap-2`}><Star size={16} className="text-[#C69C6D] fill-[#C69C6D]" /> 獎金挑戰</h4><span className="text-xs text-[#8B5E3C] font-bold">160h</span></div>
-        <div className="relative h-4 bg-[#F2EFE9] rounded-full mb-2 overflow-hidden"><div className="absolute top-0 left-0 h-full bg-[#8B5E3C] transition-all duration-1000" style={{ width: `${percent}%` }}></div>{[25,50,75,100].map(p=><div key={p} className="absolute top-0 h-full border-l border-white/50 w-px" style={{left:`${p}%`}}></div>)}</div>
-        <div className="flex justify-between text-[10px] text-slate-400 mb-4"><span>0</span><span>40h</span><span>80h</span><span>120h</span><span>160h</span></div>
-        <div className="space-y-2">{[{h:40,b:500,l:'40H↑'},{h:80,b:1000,l:'80H↑'},{h:120,b:1500,l:'120H↑'},{h:160,b:2000,l:'160H↑'}].map(t=><div key={t.h} className={`flex justify-between items-center text-sm p-2 rounded-lg ${totalEstimatedHours>=t.h?'bg-[#FFF9E6]':''}`}><span className={totalEstimatedHours>=t.h?'text-[#8B5E3C] font-bold':'text-slate-400'}>{t.l}</span><span className={totalEstimatedHours>=t.h?'text-[#8B5E3C] font-bold':'text-slate-400'}>+${t.b}</span></div>)}</div>
-      </div>
-    </div>
-  );
-};
-
-const ClosingView = ({ user, employeeName }) => {
-  const [checks, setChecks] = useState({});
-  const [log, setLog] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const handleCheck = (id) => setChecks(prev => ({ ...prev, [id]: !prev[id] }));
-  const handleSubmit = async () => {
-    const allChecked = CLOSING_CHECKLIST.every(item => checks[item.id]);
-    if (!allChecked) { alert("請完成所有檢查項目後再送出！"); return; }
-    if (!window.confirm("確定送出閉店報告嗎？")) return;
-    setIsSubmitting(true);
-    try {
-      const today = getTaiwanDateStr();
-      await addDoc(collection(db, 'closing_reports'), { date: today, timestamp: new Date().toISOString(), employeeName: employeeName || user?.displayName, uid: user?.uid, checks: checks, log: log });
-      setCompleted(true);
-      alert("閉店報告已成功送出！辛苦了！");
-    } catch (e) { console.error(e); alert("送出失敗: " + e.message); } finally { setIsSubmitting(false); }
-  };
-  if (completed) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-4">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2"><CheckCircle2 size={40} /></div>
-        <h2 className={`text-2xl font-bold ${THEME.textMain}`}>閉店完成</h2><p className="text-slate-500">今日檢查表與日誌已歸檔。<br/>辛苦了，早點休息！</p>
-        <button onClick={() => setCompleted(false)} className="text-sm text-blue-500 underline mt-4">填寫新的報告</button>
-      </div>
-    );
-  }
-  return (
-    <div className={`flex flex-col h-full p-4 space-y-4 overflow-y-auto pb-24 ${THEME.bg}`}>
-      <div className="flex items-center gap-2 mb-2 px-1"><ClipboardCheck size={24} className={THEME.textMain} /><h2 className={`text-2xl font-bold ${THEME.textMain}`}>閉店檢查</h2></div>
-      <div className={`${THEME.card} p-4 rounded-xl border ${THEME.border} shadow-sm`}><div className="text-sm text-slate-500 mb-4 flex justify-between"><span>{getTaiwanDateStr()}</span><span>執行人: {employeeName}</span></div><div className="space-y-3">{CLOSING_CHECKLIST.map(item => (<button key={item.id} onClick={() => handleCheck(item.id)} className={`w-full p-3 rounded-lg border flex items-center justify-between transition-all ${checks[item.id] ? 'bg-green-50 border-green-200 text-green-800' : 'bg-white border-slate-200 text-slate-600'}`}><div className="flex items-center gap-3"><span className="text-xl">{item.icon}</span><span className="font-bold">{item.label}</span></div>{checks[item.id] ? <CheckCircle2 size={20} className="text-green-600" /> : <div className="w-5 h-5 rounded-full border-2 border-slate-300"></div>}</button>))}</div></div>
-      <div className={`${THEME.card} p-4 rounded-xl border ${THEME.border} shadow-sm`}><div className="flex items-center gap-2 mb-2 text-slate-700 font-bold"><FileText size={18} /><h3>交接日誌 / 備註</h3></div><textarea value={log} onChange={(e) => setLog(e.target.value)} placeholder="例如：珍珠剩半包、二號桌有點晃、明日需叫貨..." className="w-full h-32 p-3 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-[#8B5E3C]" /></div>
-      <button onClick={handleSubmit} disabled={isSubmitting} className={`w-full py-4 rounded-xl font-bold text-lg shadow-md flex items-center justify-center gap-2 text-white transition-all ${isSubmitting ? 'bg-slate-400' : 'bg-[#8B5E3C] hover:opacity-90'}`}>{isSubmitting ? <><Loader2 className="animate-spin"/> 傳送中...</> : <><Lock size={20}/> 確認閉店</>}</button>
-    </div>
-  );
-};
-// NoticesView omitted for brevity (same as previous)
-
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('home');
-  const [isClockedIn, setIsClockedIn] = useState(false);
-  const [clockInTime, setClockInTime] = useState(null);
-  const [workDuration, setWorkDuration] = useState(0);
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [currentLogId, setCurrentLogId] = useState(null);
-  const [employeeName, setEmployeeName] = useState(null);
-  const [isIdentified, setIsIdentified] = useState(false);
-
+const LogModule = ({ user, appId }) => {
   const [logs, setLogs] = useState([]);
-  const [shiftsData, setShiftsData] = useState([]);
-  const [leavesData, setLeavesData] = useState([]);
-  const [notices, setNotices] = useState([]);
-  const [employees, setEmployees] = useState([]);
+  useEffect(() => {
+    if(!user) return;
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'logs'));
+    const unsub = onSnapshot(q, s => {
+      const d = s.docs.map(x => x.data());
+      d.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+      setLogs(d.slice(0,50));
+    });
+    return () => unsub();
+  }, [user, appId]);
+
+  return (
+    <div className="p-4 pb-20 max-w-md mx-auto">
+       <h2 className="text-2xl font-bold text-amber-800 mb-4"><History className="inline mr-2"/> 日誌 (近50筆)</h2>
+       <div className="space-y-2">
+         {logs.map((l, i) => (
+           <div key={i} className="bg-white p-3 rounded-lg border text-sm flex justify-between">
+             <div><span className="font-bold">{l.itemName}</span> <span className={l.action === 'reset' ? 'text-red-500' : 'text-green-600'}>{l.change}</span> {l.unit}</div>
+             <div className="text-right text-xs text-stone-400"><div>{new Date(l.timestamp).toLocaleString()}</div><div>{l.operator}</div></div>
+           </div>
+         ))}
+       </div>
+    </div>
+  );
+};
+
+const QAModule = () => {
+  const [openIndex, setOpenIndex] = useState(null);
+  return (
+    <div className="p-4 pb-20 max-w-md mx-auto">
+      <h2 className="text-2xl font-bold text-amber-800 mb-6 flex items-center"><HelpCircle className="mr-2" /> 員工問與答</h2>
+      <div className="space-y-3">
+        {QA_DATA.map((item, idx) => (
+          <div key={idx} className="bg-white border border-stone-100 rounded-xl shadow-sm overflow-hidden">
+            <button onClick={() => setOpenIndex(openIndex === idx ? null : idx)} className="w-full text左 p-4 flex justify-between items-center bg-white hover:bg-stone-50 transition"><span className="font-bold text-stone-700 flex gap-2"><span className="text-amber-500">Q.</span>{item.q}</span><span className={`transform transition-transform ${openIndex === idx ? 'rotate-180' : ''}`}>▼</span></button>
+            {openIndex === idx && <div className="p-4 bg-amber-50 text-stone-700 text-sm leading-relaxed border-t border-amber-100"><span className="font-bold text-amber-700 mr-1">A.</span>{item.a}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Navigation = ({ activeTab, onTabClick }) => {
+  const tabs = [
+    { id: 'recipes', icon: ChefHat, label: '配方製作' },
+    { id: 'inventory', icon: Package, label: '庫存管理' },
+    { id: 'history', icon: History, label: '操作日誌' },
+    { id: 'equipment', icon: Wrench, label: '設備保養' },
+    { id: 'qa', icon: HelpCircle, label: '問與答' },
+  ];
+  return (
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t pb-safe shadow-lg z-50">
+      <div className="flex justify-around items-center h-16 max-w-md mx-auto">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button key={tab.id} onClick={() => onTabClick(tab.id)} className={`flex flex-col items-center justify-center w-full h-full transition-colors ${activeTab === tab.id ? 'text-amber-600' : 'text-stone-400'}`}>
+              <Icon size={24} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
+              <span className="text-[10px] mt-1 font-medium">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// Auth Modal
+const AuthModal = ({ isOpen, onClose, onLogin, tempName, setTempName }) => {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!tempName.trim()) return setError('請輸入您的姓名');
+    if (password !== STORE_PASSWORD) return setError('密碼錯誤');
+    onLogin(tempName);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-6 border-2 border-amber-200">
+        <h3 className="text-xl font-bold text-stone-800 mb-6 text-center">員工登入</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <input type="text" value={tempName} onChange={e => setTempName(e.target.value)} className="w-full p-2 border rounded" placeholder="姓名 (例如: 神力女超人)" />
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded" placeholder="密碼" />
+            {error && <div className="text-red-500 text-xs">{error}</div>}
+            <div className="flex gap-2"><button type="button" onClick={onClose} className="flex-1 border p-2 rounded">取消</button><button type="submit" className="flex-1 bg-amber-600 text-white p-2 rounded">確認</button></div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// --- Main App Component ---
+export default function SweetSoupApp() {
+  const [activeTab, setActiveTab] = useState('recipes');
+  const [user, setUser] = useState(null);
+  const [operatorName, setOperatorName] = useState('');
+  const [authOpen, setAuthOpen] = useState(false);
+  const [isAuth, setIsAuth] = useState(false);
+  const [tempName, setTempName] = useState('');
 
   useEffect(() => {
-    if (!auth) { setLoadingAuth(false); return; }
-    onAuthStateChanged(auth, u => { 
-        setUser(u);
-        setLoadingAuth(false); 
-        if (u && !u.email) {
-            setEmployeeName("訪客員工");
-            setIsIdentified(true);
-        }
-    });
+    const init = async () => {
+      await signInAnonymously(auth).catch(e => console.error("Auth Failed", e));
+    };
+    init();
+    return onAuthStateChanged(auth, setUser);
   }, []);
 
-  const scheduleList = useMemo(() => {
-    return [...shiftsData, ...leavesData];
-  }, [shiftsData, leavesData]);
-
-  useEffect(() => {
-    if (!user || !db) return;
-    
-    // 1. 監聽員工名單 (Employees)
-    const empQ = query(collection(db, 'employees')); 
-    const unsubEmp = onSnapshot(empQ, (snap) => {
-        const emps = snap.docs.map(d => d.data());
-        setEmployees(emps);
-        if (user.email) {
-            const match = emps.find(e => e.email === user.email);
-            if (match) {
-                setEmployeeName(match.name);
-                setIsIdentified(true);
-            } else {
-                setEmployeeName(user.displayName);
-                setIsIdentified(false);
-            }
-        }
-    }, (e) => console.log('No employees collection found'));
-
-    // 2. 監聽 shifts - 修正：強制覆蓋舊時間
-    const shiftsQ = query(collection(db, 'shifts')); 
-    const unsubShifts = onSnapshot(shiftsQ, (snap) => {
-      const parsedData = snap.docs.map(d => {
-        const raw = d.data();
-        
-        // --- 強制校正邏輯開始 ---
-        // 優先讀取程式碼中的標準時間設定
-        const stdShift = SHIFT_TYPES[raw.shift] || SHIFT_TYPES[raw.type];
-        let startTime, endTime, hours;
-
-        if (stdShift && stdShift.start && stdShift.end) {
-            // 如果是標準班別（白/晚/早），強制使用新時間
-            startTime = stdShift.start;
-            endTime = stdShift.end;
-            
-            // 重新計算工時
-            const s = startTime.split(':').map(Number);
-            const e = endTime.split(':').map(Number);
-            hours = (e[0] + e[1]/60) - (s[0] + s[1]/60);
-        } else {
-            // 如果是非常規班別，才使用資料庫裡的 time 欄位
-            const parsedTime = parseTimeRange(raw.time);
-            startTime = parsedTime.start;
-            endTime = parsedTime.end;
-            hours = parsedTime.hours;
-        }
-        // --- 強制校正邏輯結束 ---
-
-        return {
-          id: d.id,
-          date: raw.date,
-          type: raw.shift, 
-          shift: raw.shift, 
-          name: raw.name,   
-          startTime: startTime,
-          endTime: endTime,
-          hours: hours,
-          isLeave: raw.shift && (raw.shift.includes('假') || raw.shift.includes('休'))
-        };
-      });
-      setShiftsData(parsedData);
-    }, (error) => console.error("Shifts error:", error));
-
-    const potentialCollections = ['leaves', 'leave', 'leave_requests', 'time_offs'];
-    const unsubscribers = [];
-
-    potentialCollections.forEach(colName => {
-        const q = query(collection(db, colName));
-        const unsub = onSnapshot(q, (snap) => {
-            if (!snap.empty) {
-                const parsedData = snap.docs.map(d => {
-                    const raw = d.data();
-                    return {
-                        id: d.id,
-                        date: raw.date,
-                        type: raw.type || raw.leaveType || '假', 
-                        shift: raw.type || raw.leaveType || '休假', 
-                        name: raw.name || raw.userName,   
-                        startTime: '-',
-                        endTime: '-',
-                        hours: 0,
-                        isLeave: true
-                    };
-                });
-                setLeavesData(prev => {
-                    const others = prev.filter(p => !p.id.startsWith(colName));
-                    return [...others, ...parsedData.map(d => ({...d, id: colName + '_' + d.id}))];
-                });
-            }
-        });
-        unsubscribers.push(unsub);
-    });
-
-    const logsQ = query(collection(db, 'users', user.uid, 'logs'), orderBy('startTime', 'desc'));
-    const unsubLogs = onSnapshot(logsQ, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setLogs(data);
-      const activeLog = data.find(l => !l.endTime);
-      if (activeLog) {
-        setIsClockedIn(true);
-        setClockInTime(new Date(activeLog.startTime));
-        setCurrentLogId(activeLog.id);
-        setWorkDuration(Math.floor((new Date() - new Date(activeLog.startTime)) / 1000));
-      } else {
-        setIsClockedIn(false);
-        setClockInTime(null);
-        setWorkDuration(0);
-        setCurrentLogId(null);
-      }
-    });
-    
-    const noticesQ = query(collection(db, 'notices'));
-    const unsubNotices = onSnapshot(noticesQ, (snap) => setNotices(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    
-    return () => { 
-        unsubEmp();
-        unsubShifts(); 
-        unsubLogs(); 
-        unsubNotices(); 
-        unsubscribers.forEach(u => u());
-    };
-  }, [user]);
-
-  const handleLogin = async () => { if(auth) try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch(e){ alert("請改用訪客試用"); }};
-  const handleGuestLogin = async () => { if(auth) try { await signInAnonymously(auth); } catch(e){} };
-  const handleLogout = () => { if(auth) signOut(auth); };
-
-  useEffect(() => {
-    let interval = null;
-    if (isClockedIn) interval = setInterval(() => setWorkDuration(p => p + 1), 1000);
-    return () => clearInterval(interval);
-  }, [isClockedIn]);
-
-  const handleClockIn = async () => {
-    if (!db || !user) return;
-    try {
-      await addDoc(collection(db, 'users', user.uid, 'logs'), { startTime: new Date().toISOString(), endTime: null, duration: 0 });
-    } catch (error) { console.error(error); alert("打卡失敗: 權限不足"); }
+  const handleTab = (id) => {
+    if((id === 'inventory' || id === 'history') && !isAuth) setAuthOpen(true);
+    else setActiveTab(id);
   };
 
-  const handleClockOut = async () => {
-    if (window.confirm('確定要下班打卡嗎？') && db && user && currentLogId) {
-      try {
-        const now = new Date();
-        const finalDuration = Math.floor((now - clockInTime) / 1000);
-        await updateDoc(doc(db, 'users', user.uid, 'logs', currentLogId), { endTime: now.toISOString(), duration: finalDuration });
-      } catch (error) { console.error(error); alert("下班打卡失敗: 權限不足"); }
-    }
+  const handleLogin = (name) => {
+    setOperatorName(name);
+    setIsAuth(true);
+    setAuthOpen(false);
+    setActiveTab('inventory');
   };
-
-  const navItems = [
-    { id: 'home', label: '打卡', icon: MapPin },
-    { id: 'schedule', label: '班表', icon: CalendarIcon },
-    { id: 'salary', label: '薪資', icon: DollarSign },
-    { id: 'closing', label: '閉店', icon: ClipboardCheck },
-    { id: 'notices', label: '通知', icon: Bell },
-  ];
-
-  if (loadingAuth) return <div className={`h-screen flex items-center justify-center ${THEME.bg} ${THEME.textSub}`}>載入中...</div>;
-  if (!user && auth) return <LoginView onLogin={handleLogin} onGuestLogin={handleGuestLogin} />;
 
   return (
-    <div className={`flex flex-col h-screen ${THEME.bg} font-sans ${THEME.textMain}`}>
-      <div className="absolute top-4 right-4 z-50"><button onClick={handleLogout} className="p-2 bg-white/50 rounded-full hover:bg-white text-slate-500"><LogOut size={16} /></button></div>
-      <main className="flex-1 overflow-hidden relative">
-        {activeTab === 'home' && <ClockInView employeeName={employeeName} isIdentified={isIdentified} isClockedIn={isClockedIn} clockInTime={clockInTime} onClockIn={handleClockIn} onClockOut={handleClockOut} workDuration={workDuration} logs={logs} scheduleList={scheduleList} />}
-        {activeTab === 'schedule' && <ScheduleView employeeName={employeeName} scheduleList={scheduleList} />}
-        {activeTab === 'salary' && <SalaryView employeeName={employeeName} workDuration={workDuration} logs={logs} scheduleList={scheduleList} />}
-        {activeTab === 'closing' && <ClosingView user={user} employeeName={employeeName} />}
-        {activeTab === 'notices' && <NoticesView notices={notices} />}
+    <div className="min-h-screen bg-stone-50 font-sans text-stone-900">
+      <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-50">
+        <h1 className="font-bold text-amber-800 flex items-center"><Droplet className="mr-2"/> 木白匠幫手</h1>
+        <div onClick={() => !isAuth && setAuthOpen(true)} className="text-xs bg-stone-100 px-2 py-1 rounded-full cursor-pointer">
+          {isAuth ? <span className="text-green-600 flex items-center"><User size={12} className="mr-1"/>{operatorName}</span> : <span className="text-stone-400 flex items-center"><Lock size={12} className="mr-1"/>未登入</span>}
+        </div>
+      </header>
+
+      <main className="animate-fade-in">
+        {activeTab === 'recipes' && <RecipeModule />}
+        {activeTab === 'inventory' && <InventoryModule user={user} appId={appId} operatorName={operatorName} />}
+        {activeTab === 'history' && <LogModule user={user} appId={appId} />}
+        {activeTab === 'equipment' && <EquipmentModule />}
+        {activeTab === 'qa' && <QAModule />}
       </main>
-      <nav className={`bg-white border-t ${THEME.border} fixed bottom-0 w-full pb-safe z-50`}>
-        <div className="flex justify-around items-center h-16">{navItems.map(i=><button key={i.id} onClick={()=>setActiveTab(i.id)} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${activeTab===i.id?'text-[#8B5E3C]':'text-[#D4C5B0]'}`}><i.icon size={24} strokeWidth={activeTab===i.id?2.5:2}/><span className="text-[10px] font-medium">{i.label}</span></button>)}</div>
-      </nav>
-      <div className="h-safe-bottom bg-white" />
+
+      <AuthModal isOpen={authOpen} onClose={() => setAuthOpen(false)} onLogin={handleLogin} tempName={tempName} setTempName={setTempName} />
+      <Navigation activeTab={activeTab} onTabClick={handleTab} />
     </div>
   );
 }
+
+// 🔚 把 App 真正掛到 #root 上
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <SweetSoupApp />
+  </React.StrictMode>
+);
